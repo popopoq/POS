@@ -6,25 +6,24 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="小餐館POS">
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/924/924514.png">
     <title>小餐館 POS</title>
     <style>
         :root { --primary: #007bff; --success: #28a745; --danger: #dc3545; --warning: #ffc107; --dark: #343a40; --bg: #f4f7f6; }
         body { font-family: -apple-system, "Microsoft JhengHei", sans-serif; margin: 10px; background: var(--bg); padding-bottom: 120px; -webkit-tap-highlight-color: transparent; }
         
-        h2 { text-align: center; margin: 10px 0; color: #333; }
-        
+        /* 分類標籤樣式 */
+        .category-tabs { display: flex; gap: 10px; margin-bottom: 15px; padding: 5px 0; }
+        .tab { flex: 1; text-align: center; padding: 12px 0; background: white; border: 1px solid #ddd; border-radius: 12px; font-weight: bold; cursor: pointer; }
+        .tab.active { background: var(--primary); color: white; border-color: var(--primary); box-shadow: 0 4px 8px rgba(0,123,255,0.3); }
+
         /* 菜單 */
         .menu-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
         .menu-item { display: flex; justify-content: space-between; align-items: center; padding: 18px 20px; background: white; border: 1px solid #eee; border-radius: 12px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         .menu-item b { font-size: 1.2em; }
-        .menu-item span { color: var(--danger); font-weight: bold; }
-
-        /* 購物車 */
-        .cart-card { background: #fff; padding: 15px; border-radius: 15px; border: 2px solid var(--primary); margin-top: 10px; position: relative; }
-        .cart-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #eee; }
         
-        /* 輸入區域 */
+        /* 購物車與輸入 */
+        .cart-card { background: #fff; padding: 15px; border-radius: 15px; border: 2px solid var(--primary); margin-top: 10px; }
+        .cart-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #eee; }
         .customer-box { margin-top: 15px; padding-top: 15px; border-top: 2px solid #eee; }
         .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
         .input-row input, .full-input { padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; width: 100%; box-sizing: border-box; }
@@ -33,19 +32,15 @@
         .order-card { background: white; border-left: 6px solid var(--warning); padding: 15px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 12px; }
         .order-card.finished { border-left-color: var(--success); opacity: 0.7; }
         .order-header { display: flex; justify-content: space-between; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px; }
-        
-        /* 彈窗標籤 */
-        .tag-group { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
-        .tag { padding: 8px 12px; background: #f0f0f0; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; cursor: pointer; }
-        .tag:active { background: var(--warning); }
 
-        /* 彈窗 */
+        /* 備註標籤 */
+        .tag-group { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+        .tag { padding: 8px 12px; background: #f0f0f0; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+
+        /* 彈窗與按鈕 */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; }
         .modal-content { background: white; margin: 10% auto; padding: 20px; width: 85%; border-radius: 15px; text-align: center; }
-        
-        /* 按鈕 */
-        .btn-main { width: 100%; padding: 18px; background: var(--success); color: white; border: none; border-radius: 10px; font-size: 1.3em; font-weight: bold; margin-top: 15px; cursor: pointer; }
-        .btn-main:active { opacity: 0.8; transform: scale(0.98); }
+        .btn-main { width: 100%; padding: 18px; background: var(--success); color: white; border: none; border-radius: 10px; font-size: 1.3em; font-weight: bold; margin-top: 15px; }
         .btn-qty { width: 45px; height: 45px; border: 1px solid #ddd; background: white; border-radius: 8px; font-size: 24px; }
         
         .footer-nav { position: fixed; bottom: 0; left: 0; right: 0; background: white; display: flex; border-top: 1px solid #ddd; padding: 10px; z-index: 1000; }
@@ -57,6 +52,13 @@
 
     <div id="page-order">
         <h2>🍴 點餐收銀</h2>
+        
+        <div class="category-tabs" id="category-tabs">
+            <div class="tab active" onclick="filterMenu('主食')">主食</div>
+            <div class="tab" onclick="filterMenu('湯品')">湯品</div>
+            <div class="tab" onclick="filterMenu('小菜')">小菜</div>
+        </div>
+        
         <div id="menu-display" class="menu-grid"></div>
 
         <div class="cart-card">
@@ -67,11 +69,10 @@
                     <input type="text" id="cust-name" placeholder="名字">
                     <input type="tel" id="cust-phone" placeholder="電話">
                 </div>
-                <input type="text" id="pickup-memo" class="full-input" placeholder="取餐備註 (如：12:30拿)">
+                <input type="text" id="pickup-memo" class="full-input" placeholder="取餐時間/備註 (如：12:30拿)">
                 <div style="font-size: 1.8em; font-weight: 900; color: var(--danger); text-align: right; margin-top: 15px;">$ <span id="cart-total">0</span></div>
             </div>
             <button class="btn-main" onclick="submitOrder()">✅ 成立訂單</button>
-            <button onclick="clearCart()" style="width:100%; background:none; border:none; color:gray; margin-top:15px;">清空重選</button>
         </div>
     </div>
 
@@ -85,17 +86,14 @@
     <div id="note-modal" class="modal">
         <div class="modal-content">
             <h3 id="modal-item-name" style="margin:0;">餐點設定</h3>
-            
             <div class="tag-group">
                 <div class="tag" onclick="addTag('微辣')">🌶️ 微辣</div>
                 <div class="tag" onclick="addTag('小辣')">🌶️🌶️ 小辣</div>
                 <div class="tag" onclick="addTag('大辣')">🥵 大辣</div>
-                <div class="tag" onclick="addTag('不加蔥')">🌿 不加蔥</div>
-                <div class="tag" onclick="addTag('不加沙茶')">🚫 不加沙茶</div>
+                <div class="tag" onclick="addTag('不蔥')">🌿 不蔥</div>
+                <div class="tag" onclick="addTag('不沙茶')">🚫 不沙茶</div>
             </div>
-
             <input type="text" id="note-input" placeholder="其他備註..." style="width:100%; padding:12px; margin-bottom:15px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box;">
-            
             <div style="display:flex; align-items:center; justify-content:center; gap:25px; margin-bottom:20px;">
                 <button class="btn-qty" onclick="changeModalQty(-1)">-</button>
                 <b id="modal-qty" style="font-size:24px;">1</b>
@@ -108,12 +106,6 @@
         </div>
     </div>
 
-    <div class="footer-nav">
-        <button id="nav-order" class="active" onclick="showPage('order')">🔘 點餐</button>
-        <button id="nav-queue" onclick="showPage('queue')">📋 等單區 (<span id="queue-count">0</span>)</button>
-        <button onclick="toggleModal('settings-modal')">⚙️ 菜單</button>
-    </div>
-
     <div id="settings-modal" class="modal">
         <div class="modal-content" style="margin: 5% auto; width: 90%; height: 80%; overflow-y: auto; text-align: left;">
             <h3>⚙️ 菜單管理</h3>
@@ -122,15 +114,30 @@
             <h4>➕ 新增餐點</h4>
             <input type="text" id="new-name" placeholder="品名" style="width:100%; padding:10px; margin-bottom:8px;">
             <input type="number" id="new-price" placeholder="價格" style="width:100%; padding:10px; margin-bottom:8px;">
+            <select id="new-category" style="width:100%; padding:10px; margin-bottom:10px; border-radius:8px;">
+                <option value="主食">主食</option>
+                <option value="湯品">湯品</option>
+                <option value="小菜">小菜</option>
+            </select>
             <button onclick="addMenuItem()" style="width:100%; padding:15px; background:var(--primary); color:white; border:none; border-radius:10px;">新增</button>
             <button onclick="toggleModal('settings-modal')" style="width:100%; margin-top:20px; padding:10px;">關閉</button>
         </div>
     </div>
 
+    <div class="footer-nav">
+        <button id="nav-order" class="active" onclick="showPage('order')">🔘 點餐</button>
+        <button id="nav-queue" onclick="showPage('queue')">📋 等單區 (<span id="queue-count">0</span>)</button>
+        <button onclick="toggleModal('settings-modal')">⚙️ 菜單</button>
+    </div>
+
     <script>
-        let menu = JSON.parse(localStorage.getItem('myMenu')) || [{name:'肉絲蛋炒飯', price:70}, {name:'貢丸湯', price:30}];
+        let menu = JSON.parse(localStorage.getItem('myMenu')) || [
+            {name:'肉絲蛋炒飯', price:70, category:'主食'},
+            {name:'貢丸湯', price:30, category:'湯品'}
+        ];
         let cart = [];
         let orders = JSON.parse(localStorage.getItem('myOrders')) || [];
+        let currentCat = '主食'; // 預設改為顯示主食
         let tempItem = null, tempQty = 1;
 
         function init() { renderMenu(); renderCart(); renderQueue(); renderEditList(); }
@@ -142,8 +149,15 @@
             document.getElementById('nav-queue').classList.toggle('active', page === 'queue');
         }
 
+        function filterMenu(cat) {
+            currentCat = cat;
+            document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.innerText === cat));
+            renderMenu();
+        }
+
         function renderMenu() {
-            document.getElementById('menu-display').innerHTML = menu.map(item => `
+            const display = menu.filter(m => m.category === currentCat);
+            document.getElementById('menu-display').innerHTML = display.map(item => `
                 <div class="menu-item" onclick="openNoteModal('${item.name}', ${item.price})">
                     <b>${item.name}</b> <span>$${item.price}</span>
                 </div>
@@ -160,7 +174,7 @@
 
         function addTag(tag) {
             let input = document.getElementById('note-input');
-            input.value = input.value ? input.value + ", " + tag : tag;
+            input.value = input.value ? input.value + " " + tag : tag;
         }
 
         function changeModalQty(d) { tempQty = Math.max(1, tempQty + d); document.getElementById('modal-qty').innerText = tempQty; }
@@ -184,39 +198,31 @@
             document.getElementById('cart-total').innerText = total;
         }
 
-        function clearCart() { cart = []; renderCart(); }
-
         function submitOrder() {
-            if(cart.length === 0) return alert('清單是空的');
+            if(cart.length === 0) return alert('請先點餐');
             const now = new Date();
             const timeStr = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
             const newOrder = {
-                id: Date.now(),
-                createTime: timeStr,
+                id: Date.now(), createTime: timeStr,
                 custName: document.getElementById('cust-name').value || '現場客',
                 custPhone: document.getElementById('cust-phone').value || '-',
                 pickupMemo: document.getElementById('pickup-memo').value || '儘快',
-                items: [...cart],
-                total: document.getElementById('cart-total').innerText,
-                status: 'waiting'
+                items: [...cart], total: document.getElementById('cart-total').innerText, status: 'waiting'
             };
             orders.unshift(newOrder);
             localStorage.setItem('myOrders', JSON.stringify(orders));
-            clearCart();
-            document.getElementById('cust-name').value = "";
-            document.getElementById('cust-phone').value = "";
-            document.getElementById('pickup-memo').value = "";
-            renderQueue();
-            alert('訂單成立！');
+            cart = []; renderCart();
+            document.getElementById('cust-name').value = ""; document.getElementById('cust-phone').value = ""; document.getElementById('pickup-memo').value = "";
+            renderQueue(); alert('訂單成立！');
         }
 
         function renderQueue() {
-            const waitOrders = orders.filter(o => o.status === 'waiting');
-            const doneOrders = orders.filter(o => o.status === 'done');
-            document.getElementById('queue-count').innerText = waitOrders.length;
-            document.getElementById('waiting-orders').innerHTML = waitOrders.map(o => `
+            const wait = orders.filter(o => o.status === 'waiting');
+            const done = orders.filter(o => o.status === 'done');
+            document.getElementById('queue-count').innerText = wait.length;
+            document.getElementById('waiting-orders').innerHTML = wait.map(o => `
                 <div class="order-card">
-                    <div class="order-header"><span style="font-weight:bold; color:var(--primary);">👤 ${o.custName}</span><span style="font-size:12px; color:#666;">🕒 ${o.createTime}</span></div>
+                    <div class="order-header"><b>👤 ${o.custName}</b><span style="font-size:12px; color:#666;">🕒 ${o.createTime}</span></div>
                     <div style="font-size:13px; color:#555; margin-bottom:8px;">📞 ${o.custPhone} | 備註: ${o.pickupMemo}</div>
                     <div style="font-size:15px; border-top:1px dashed #eee; padding-top:8px;">
                         ${o.items.map(i => `• ${i.name} x ${i.qty} ${i.note ? `<span style="color:red">[${i.note}]</span>` : ''}`).join('<br>')}
@@ -228,28 +234,25 @@
                     </div>
                 </div>
             `).join('') || '<p style="text-align:center; color:#999;">目前無訂單</p>';
-            document.getElementById('history-orders').innerHTML = doneOrders.map(o => `<div class="order-card finished"><div><b>${o.custName}</b> - $${o.total}</div></div>`).join('');
+            document.getElementById('history-orders').innerHTML = done.map(o => `<div class="order-card finished"><div><b>${o.custName}</b> - $${o.total}</div></div>`).join('');
         }
 
-        function updateStatus(id, s) { 
-            const o = orders.find(x => x.id === id); if(o) o.status = s; 
-            localStorage.setItem('myOrders', JSON.stringify(orders)); renderQueue(); 
-        }
+        function updateStatus(id, s) { const o = orders.find(x => x.id === id); if(o) o.status = s; localStorage.setItem('myOrders', JSON.stringify(orders)); renderQueue(); }
         function deleteOrder(id) { if(confirm('刪除？')) { orders = orders.filter(x => x.id !== id); localStorage.setItem('myOrders', JSON.stringify(orders)); renderQueue(); } }
         function toggleModal(id) { const m = document.getElementById(id); m.style.display = (m.style.display==='block'?'none':'block'); }
         
         function renderEditList() {
             document.getElementById('edit-list').innerHTML = menu.map((item, i) => `
-                <div style="padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between;">
-                    <span><b>${item.name}</b> ($${item.price})</span>
+                <div style="padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+                    <span><b>${item.name}</b> [${item.category}] ($${item.price})</span>
                     <button onclick="menu.splice(${i},1);localStorage.setItem('myMenu',JSON.stringify(menu));renderEditList();renderMenu();" style="color:red; border:none; background:none;">刪除</button>
                 </div>
             `).join('');
         }
         function addMenuItem() {
-            const n = document.getElementById('new-name'), p = document.getElementById('new-price');
+            const n = document.getElementById('new-name'), p = document.getElementById('new-price'), c = document.getElementById('new-category');
             if(n.value && p.value) {
-                menu.push({name: n.value, price: parseInt(p.value)});
+                menu.push({name: n.value, price: parseInt(p.value), category: c.value});
                 localStorage.setItem('myMenu', JSON.stringify(menu));
                 renderMenu(); renderEditList(); n.value=""; p.value="";
             }
