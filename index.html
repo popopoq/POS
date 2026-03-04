@@ -11,17 +11,17 @@
         :root { --primary: #007bff; --success: #28a745; --danger: #dc3545; --warning: #ffc107; --dark: #343a40; --bg: #f4f7f6; }
         body { font-family: -apple-system, "Microsoft JhengHei", sans-serif; margin: 10px; background: var(--bg); padding-bottom: 120px; -webkit-tap-highlight-color: transparent; }
         
-        /* 分類標籤樣式 */
+        /* 分類標籤 */
         .category-tabs { display: flex; gap: 10px; margin-bottom: 15px; padding: 5px 0; }
         .tab { flex: 1; text-align: center; padding: 12px 0; background: white; border: 1px solid #ddd; border-radius: 12px; font-weight: bold; cursor: pointer; }
         .tab.active { background: var(--primary); color: white; border-color: var(--primary); box-shadow: 0 4px 8px rgba(0,123,255,0.3); }
 
         /* 菜單 */
         .menu-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
-        .menu-item { display: flex; justify-content: space-between; align-items: center; padding: 18px 20px; background: white; border: 1px solid #eee; border-radius: 12px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .menu-item { display: flex; justify-content: space-between; align-items: center; padding: 18px 20px; background: white; border: 1px solid #eee; border-radius: 12px; cursor: pointer; }
         .menu-item b { font-size: 1.2em; }
         
-        /* 購物車與輸入 */
+        /* 購物車 */
         .cart-card { background: #fff; padding: 15px; border-radius: 15px; border: 2px solid var(--primary); margin-top: 10px; }
         .cart-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #eee; }
         .customer-box { margin-top: 15px; padding-top: 15px; border-top: 2px solid #eee; }
@@ -30,12 +30,15 @@
         
         /* 訂單卡片 */
         .order-card { background: white; border-left: 6px solid var(--warning); padding: 15px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 12px; }
-        .order-card.finished { border-left-color: var(--success); opacity: 0.7; }
+        .order-card.finished { border-left-color: var(--success); opacity: 0.9; }
         .order-header { display: flex; justify-content: space-between; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px; }
 
-        /* 備註標籤 */
+        /* 備註與標籤 */
         .tag-group { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
         .tag { padding: 8px 12px; background: #f0f0f0; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+
+        /* 營收統計 */
+        .summary-card { background: var(--dark); color: white; padding: 20px; border-radius: 15px; margin-top: 30px; text-align: center; }
 
         /* 彈窗與按鈕 */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; }
@@ -43,6 +46,7 @@
         .btn-main { width: 100%; padding: 18px; background: var(--success); color: white; border: none; border-radius: 10px; font-size: 1.3em; font-weight: bold; margin-top: 15px; }
         .btn-qty { width: 45px; height: 45px; border: 1px solid #ddd; background: white; border-radius: 8px; font-size: 24px; }
         
+        /* 下方導航 */
         .footer-nav { position: fixed; bottom: 0; left: 0; right: 0; background: white; display: flex; border-top: 1px solid #ddd; padding: 10px; z-index: 1000; }
         .footer-nav button { flex: 1; background: none; border: none; color: #666; font-size: 16px; padding: 10px; font-weight: bold; }
         .footer-nav button.active { color: var(--primary); }
@@ -52,24 +56,18 @@
 
     <div id="page-order">
         <h2>🍴 點餐收銀</h2>
-        
-        <div class="category-tabs" id="category-tabs">
+        <div class="category-tabs">
             <div class="tab active" onclick="filterMenu('主食')">主食</div>
             <div class="tab" onclick="filterMenu('湯品')">湯品</div>
             <div class="tab" onclick="filterMenu('小菜')">小菜</div>
         </div>
-        
         <div id="menu-display" class="menu-grid"></div>
-
         <div class="cart-card">
             <h3 style="margin:0 0 10px">🛒 點餐明細</h3>
             <div id="cart-items"></div>
             <div class="customer-box">
-                <div class="input-row">
-                    <input type="text" id="cust-name" placeholder="名字">
-                    <input type="tel" id="cust-phone" placeholder="電話">
-                </div>
-                <input type="text" id="pickup-memo" class="full-input" placeholder="取餐時間/備註 (如：12:30拿)">
+                <div class="input-row"><input type="text" id="cust-name" placeholder="名字"><input type="tel" id="cust-phone" placeholder="電話"></div>
+                <input type="text" id="pickup-memo" class="full-input" placeholder="取餐時間/備註">
                 <div style="font-size: 1.8em; font-weight: 900; color: var(--danger); text-align: right; margin-top: 15px;">$ <span id="cart-total">0</span></div>
             </div>
             <button class="btn-main" onclick="submitOrder()">✅ 成立訂單</button>
@@ -79,25 +77,33 @@
     <div id="page-queue" style="display:none;">
         <h2>⏳ 等單管理區</h2>
         <div id="waiting-orders"></div>
-        <div style="background: var(--dark); color:white; padding:10px; border-radius:8px; margin: 20px 0 10px;">✅ 最近已完成</div>
+        
+        <div style="background: var(--success); color:white; padding:10px; border-radius:8px; margin: 20px 0 10px; display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-weight:bold;">✅ 已完成訂單</span>
+            <button onclick="clearHistoryOnly()" style="background:white; color:var(--danger); border:none; padding:4px 10px; border-radius:5px; font-size:12px; font-weight:bold;">🗑️ 全部刪除</button>
+        </div>
         <div id="history-orders"></div>
+
+        <div class="summary-card">
+            <div style="font-size: 1.1em; opacity: 0.8;">今日累計營業額</div>
+            <div style="font-size: 2.5em; font-weight: bold; margin: 10px 0;">$ <span id="daily-revenue">0</span></div>
+            <button onclick="clearDailyStats()" style="background:rgba(255,255,255,0.2); border:1px solid white; color:white; padding:8px 15px; border-radius:8px; font-size:14px;">下班結算 (清空所有紀錄)</button>
+        </div>
     </div>
 
     <div id="note-modal" class="modal">
         <div class="modal-content">
-            <h3 id="modal-item-name" style="margin:0;">餐點設定</h3>
+            <h3 id="modal-item-name">餐點設定</h3>
             <div class="tag-group">
                 <div class="tag" onclick="addTag('微辣')">🌶️ 微辣</div>
-                <div class="tag" onclick="addTag('小辣')">🌶️🌶️ 小辣</div>
+                <div class="tag" onclick="addTag('小辣')">🌶️ 小辣</div>
                 <div class="tag" onclick="addTag('大辣')">🥵 大辣</div>
                 <div class="tag" onclick="addTag('不蔥')">🌿 不蔥</div>
                 <div class="tag" onclick="addTag('不沙茶')">🚫 不沙茶</div>
             </div>
             <input type="text" id="note-input" placeholder="其他備註..." style="width:100%; padding:12px; margin-bottom:15px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box;">
             <div style="display:flex; align-items:center; justify-content:center; gap:25px; margin-bottom:20px;">
-                <button class="btn-qty" onclick="changeModalQty(-1)">-</button>
-                <b id="modal-qty" style="font-size:24px;">1</b>
-                <button class="btn-qty" onclick="changeModalQty(1)">+</button>
+                <button class="btn-qty" onclick="changeModalQty(-1)">-</button><b id="modal-qty" style="font-size:24px;">1</b><button class="btn-qty" onclick="changeModalQty(1)">+</button>
             </div>
             <div style="display:flex; gap:10px;">
                 <button onclick="toggleModal('note-modal')" style="flex:1; padding:15px; background:#eee; border-radius:10px; border:none;">取消</button>
@@ -107,17 +113,14 @@
     </div>
 
     <div id="settings-modal" class="modal">
-        <div class="modal-content" style="margin: 5% auto; width: 90%; height: 80%; overflow-y: auto; text-align: left;">
+        <div class="modal-content" style="text-align: left; height: 80%; overflow-y: auto;">
             <h3>⚙️ 菜單管理</h3>
-            <div id="edit-list"></div>
-            <hr>
+            <div id="edit-list"></div><hr>
             <h4>➕ 新增餐點</h4>
             <input type="text" id="new-name" placeholder="品名" style="width:100%; padding:10px; margin-bottom:8px;">
             <input type="number" id="new-price" placeholder="價格" style="width:100%; padding:10px; margin-bottom:8px;">
             <select id="new-category" style="width:100%; padding:10px; margin-bottom:10px; border-radius:8px;">
-                <option value="主食">主食</option>
-                <option value="湯品">湯品</option>
-                <option value="小菜">小菜</option>
+                <option value="主食">主食</option><option value="湯品">湯品</option><option value="小菜">小菜</option>
             </select>
             <button onclick="addMenuItem()" style="width:100%; padding:15px; background:var(--primary); color:white; border:none; border-radius:10px;">新增</button>
             <button onclick="toggleModal('settings-modal')" style="width:100%; margin-top:20px; padding:10px;">關閉</button>
@@ -131,14 +134,10 @@
     </div>
 
     <script>
-        let menu = JSON.parse(localStorage.getItem('myMenu')) || [
-            {name:'肉絲蛋炒飯', price:70, category:'主食'},
-            {name:'貢丸湯', price:30, category:'湯品'}
-        ];
+        let menu = JSON.parse(localStorage.getItem('myMenu')) || [{name:'肉絲蛋炒飯', price:70, category:'主食'},{name:'貢丸湯', price:30, category:'湯品'}];
         let cart = [];
         let orders = JSON.parse(localStorage.getItem('myOrders')) || [];
-        let currentCat = '主食'; // 預設改為顯示主食
-        let tempItem = null, tempQty = 1;
+        let currentCat = '主食', tempItem = null, tempQty = 1;
 
         function init() { renderMenu(); renderCart(); renderQueue(); renderEditList(); }
 
@@ -158,9 +157,7 @@
         function renderMenu() {
             const display = menu.filter(m => m.category === currentCat);
             document.getElementById('menu-display').innerHTML = display.map(item => `
-                <div class="menu-item" onclick="openNoteModal('${item.name}', ${item.price})">
-                    <b>${item.name}</b> <span>$${item.price}</span>
-                </div>
+                <div class="menu-item" onclick="openNoteModal('${item.name}', ${item.price})"><b>${item.name}</b> <span>$${item.price}</span></div>
             `).join('');
         }
 
@@ -180,20 +177,16 @@
         function changeModalQty(d) { tempQty = Math.max(1, tempQty + d); document.getElementById('modal-qty').innerText = tempQty; }
 
         function addToCart() {
-            const note = document.getElementById('note-input').value;
-            cart.push({...tempItem, note, qty: tempQty});
-            renderCart();
-            toggleModal('note-modal');
+            cart.push({...tempItem, note: document.getElementById('note-input').value, qty: tempQty});
+            renderCart(); toggleModal('note-modal');
         }
 
         function renderCart() {
             let total = 0;
             document.getElementById('cart-items').innerHTML = cart.map((item, i) => {
                 total += item.price * item.qty;
-                return `<div class="cart-row">
-                    <span><b>${item.name}</b> x ${item.qty} ${item.note ? `<br><small style="color:red">└ ${item.note}</small>` : ''}</span>
-                    <span>$${item.price * item.qty} <button onclick="cart.splice(${i},1);renderCart()" style="color:red; border:none; background:none; padding:10px;">✕</button></span>
-                </div>`;
+                return `<div class="cart-row"><span><b>${item.name}</b> x ${item.qty} ${item.note ? `<br><small style="color:red">└ ${item.note}</small>` : ''}</span>
+                <span>$${item.price * item.qty} <button onclick="cart.splice(${i},1);renderCart()" style="color:red; border:none; background:none; padding:10px;">✕</button></span></div>`;
             }).join('') || '<p style="text-align:center; color:#999;">尚未點餐</p>';
             document.getElementById('cart-total').innerText = total;
         }
@@ -202,14 +195,13 @@
             if(cart.length === 0) return alert('請先點餐');
             const now = new Date();
             const timeStr = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
-            const newOrder = {
+            orders.unshift({
                 id: Date.now(), createTime: timeStr,
                 custName: document.getElementById('cust-name').value || '現場客',
                 custPhone: document.getElementById('cust-phone').value || '-',
                 pickupMemo: document.getElementById('pickup-memo').value || '儘快',
-                items: [...cart], total: document.getElementById('cart-total').innerText, status: 'waiting'
-            };
-            orders.unshift(newOrder);
+                items: [...cart], total: parseInt(document.getElementById('cart-total').innerText), status: 'waiting'
+            });
             localStorage.setItem('myOrders', JSON.stringify(orders));
             cart = []; renderCart();
             document.getElementById('cust-name').value = ""; document.getElementById('cust-phone').value = ""; document.getElementById('pickup-memo').value = "";
@@ -219,7 +211,12 @@
         function renderQueue() {
             const wait = orders.filter(o => o.status === 'waiting');
             const done = orders.filter(o => o.status === 'done');
+            let revenue = 0;
+            done.forEach(o => revenue += o.total);
+
             document.getElementById('queue-count').innerText = wait.length;
+            document.getElementById('daily-revenue').innerText = revenue;
+
             document.getElementById('waiting-orders').innerHTML = wait.map(o => `
                 <div class="order-card">
                     <div class="order-header"><b>👤 ${o.custName}</b><span style="font-size:12px; color:#666;">🕒 ${o.createTime}</span></div>
@@ -234,13 +231,49 @@
                     </div>
                 </div>
             `).join('') || '<p style="text-align:center; color:#999;">目前無訂單</p>';
-            document.getElementById('history-orders').innerHTML = done.map(o => `<div class="order-card finished"><div><b>${o.custName}</b> - $${o.total}</div></div>`).join('');
+
+            document.getElementById('history-orders').innerHTML = done.map(o => `
+                <div class="order-card finished">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div><b>${o.custName}</b> - $${o.total} <small>(${o.createTime})</small></div>
+                        <button onclick="deleteOrder(${o.id})" style="color:red; border:none; background:none; font-size:18px; padding:5px 10px;">✕</button>
+                    </div>
+                </div>
+            `).join('');
         }
 
-        function updateStatus(id, s) { const o = orders.find(x => x.id === id); if(o) o.status = s; localStorage.setItem('myOrders', JSON.stringify(orders)); renderQueue(); }
-        function deleteOrder(id) { if(confirm('刪除？')) { orders = orders.filter(x => x.id !== id); localStorage.setItem('myOrders', JSON.stringify(orders)); renderQueue(); } }
+        function updateStatus(id, s) { 
+            const o = orders.find(x => x.id === id); if(o) o.status = s; 
+            localStorage.setItem('myOrders', JSON.stringify(orders)); renderQueue(); 
+        }
+
+        function deleteOrder(id) { 
+            if(confirm('確定刪除此筆紀錄？')) { 
+                orders = orders.filter(x => x.id !== id); 
+                localStorage.setItem('myOrders', JSON.stringify(orders)); 
+                renderQueue(); 
+            } 
+        }
+
+        // --- 新增的功能：僅刪除歷史紀錄 ---
+        function clearHistoryOnly() {
+            if(confirm('確定要一鍵刪除所有「已完成」的歷史紀錄嗎？\n(「等單中」的訂單將會保留)')) {
+                orders = orders.filter(o => o.status === 'waiting');
+                localStorage.setItem('myOrders', JSON.stringify(orders));
+                renderQueue();
+            }
+        }
+
+        function clearDailyStats() {
+            if(confirm('結算後會清空所有訂單(含排隊中)，確定結算嗎？')) {
+                orders = [];
+                localStorage.setItem('myOrders', JSON.stringify(orders));
+                renderQueue();
+                alert('結算完成！營業額已歸零。');
+            }
+        }
+
         function toggleModal(id) { const m = document.getElementById(id); m.style.display = (m.style.display==='block'?'none':'block'); }
-        
         function renderEditList() {
             document.getElementById('edit-list').innerHTML = menu.map((item, i) => `
                 <div style="padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
