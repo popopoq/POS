@@ -17,7 +17,6 @@
         .tab { padding: 10px 20px; background: white; border: 1px solid #ddd; border-radius: 20px; white-space: nowrap; cursor: pointer; font-weight: bold; }
         .tab.active { background: var(--primary); color: white; border-color: var(--primary); }
 
-        /* 關鍵修改：改為橫向排列 */
         .menu-grid { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
         .menu-item { display: flex; justify-content: space-between; align-items: center; padding: 18px 20px; background: white; border: 2px solid #dee2e6; border-radius: 12px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         .menu-item:active { background: #e9ecef; transform: scale(0.98); }
@@ -26,23 +25,33 @@
 
         .order-card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); border: 1px solid #eee; }
         .order-row { padding: 12px 0; border-bottom: 1px dashed #ddd; }
-        .order-main { display: flex; justify-content: space-between; font-weight: bold; font-size: 1.1em; }
+        .order-main { display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 1.1em; }
+        .qty-controls { display: flex; align-items: center; gap: 10px; }
+        .btn-qty { width: 32px; height: 32px; border-radius: 8px; border: 1px solid #ccc; background: #fff; font-size: 20px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
         .order-note { font-size: 0.95em; color: #d63384; padding-left: 10px; margin-top: 6px; font-weight: 500; }
         .total-section { font-size: 1.8em; text-align: right; margin-top: 20px; color: var(--danger); font-weight: 900; border-top: 2px solid #eee; padding-top: 10px; }
         
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; }
-        .modal-content { background: white; margin: 15% auto; padding: 25px; width: 85%; border-radius: 20px; box-sizing: border-box; }
+        .modal-content { background: white; margin: 10% auto; padding: 25px; width: 90%; border-radius: 20px; box-sizing: border-box; }
         .tag-group { display: flex; flex-wrap: wrap; gap: 10px; margin: 15px 0; }
         .tag { padding: 12px 15px; background: #f0f0f0; border-radius: 10px; font-size: 16px; cursor: pointer; border: 1px solid #ddd; }
         .tag:active { background: var(--warning); }
 
+        /* 彈窗內的數量選擇器 */
+        .modal-qty-box { display: flex; align-items: center; justify-content: center; gap: 20px; margin: 20px 0; padding: 10px; background: #f8f9fa; border-radius: 12px; }
+        .modal-qty-btn { width: 45px; height: 45px; background: white; border: 2px solid var(--primary); color: var(--primary); border-radius: 50%; font-size: 24px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        
         .btn-group { position: fixed; bottom: 0; left: 0; right: 0; display: flex; padding: 15px; background: white; gap: 12px; box-shadow: 0 -4px 10px rgba(0,0,0,0.05); }
         button { border: none; border-radius: 10px; font-size: 18px; font-weight: bold; padding: 18px; cursor: pointer; }
         .btn-print { background: var(--success); color: white; flex: 2; }
         .btn-clear { background: #adb5bd; color: white; flex: 1; }
         .btn-settings { background: #f1f3f5; color: var(--dark); flex: 1; border: 1px solid #ddd; }
 
-        @media print { .btn-group, .menu-grid, h2, .modal, .tag-group, .btn-settings, .btn-clear, .category-tabs { display: none !important; } body { margin: 0; padding: 0; background: white; } .order-card { box-shadow: none; border: none; width: 100%; padding: 0; } }
+        @media print { 
+            .btn-group, .menu-grid, h2, .modal, .tag-group, .btn-settings, .btn-clear, .category-tabs, .btn-qty { display: none !important; } 
+            body { margin: 0; padding: 0; background: white; } 
+            .order-card { box-shadow: none; border: none; width: 100%; padding: 0; } 
+        }
     </style>
 </head>
 <body>
@@ -67,7 +76,7 @@
 
     <div id="note-modal" class="modal">
         <div class="modal-content">
-            <h3 id="note-title" style="margin-top:0;">餐點備註</h3>
+            <h3 id="note-title" style="margin-top:0;">餐點設定</h3>
             <div class="tag-group">
                 <div class="tag" onclick="addTag('微辣')">🌶️ 微辣</div>
                 <div class="tag" onclick="addTag('小辣')">🌶️🌶️ 小辣</div>
@@ -75,10 +84,20 @@
                 <div class="tag" onclick="addTag('不加蔥')">🌿 不加蔥</div>
                 <div class="tag" onclick="addTag('不加沙茶')">🚫 不加沙茶</div>
             </div>
-            <input type="text" id="note-input" placeholder="其他特殊要求..." style="width:100%; padding:15px; box-sizing:border-box; border:1px solid #ccc; border-radius:8px; font-size:16px;">
-            <div style="display:flex; gap:10px; margin-top:20px;">
+            <input type="text" id="note-input" placeholder="其他要求..." style="width:100%; padding:15px; box-sizing:border-box; border:1px solid #ccc; border-radius:8px; font-size:16px;">
+            
+            <div class="modal-qty-box">
+                <div class="modal-qty-btn" onclick="changeModalQty(-1)">−</div>
+                <div style="text-align:center;">
+                    <div style="font-size:14px; color:#666;">數量</div>
+                    <div id="modal-qty-num" style="font-size:24px; font-weight:bold;">1</div>
+                </div>
+                <div class="modal-qty-btn" onclick="changeModalQty(1)">+</div>
+            </div>
+
+            <div style="display:flex; gap:10px;">
                 <button onclick="toggleModal('note-modal')" style="flex:1; background:#eee;">取消</button>
-                <button onclick="confirmNote()" style="flex:2; background:var(--primary); color:white;">加入</button>
+                <button onclick="confirmNote()" style="flex:2; background:var(--primary); color:white;">加入清單</button>
             </div>
         </div>
     </div>
@@ -89,7 +108,7 @@
             <div id="edit-list"></div>
             <hr>
             <h4>新增餐點</h4>
-            <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:10px;">
+            <div style="display:flex; flex-direction:column; gap:10px;">
                 <div style="display:flex; gap:5px;">
                     <input type="text" id="new-name" placeholder="品名" style="flex:2; padding:10px;">
                     <input type="number" id="new-price" placeholder="價格" style="flex:1; padding:10px;">
@@ -100,7 +119,7 @@
                     <option value="小菜">小菜</option>
                 </select>
             </div>
-            <button onclick="addMenuItem()" style="width:100%; background:var(--primary); color:white; padding:12px;">➕ 新增</button>
+            <button onclick="addMenuItem()" style="width:100%; background:var(--primary); color:white; padding:12px; margin-top:10px;">➕ 新增</button>
             <button onclick="toggleModal('settings-modal')" style="width:100%; margin-top:25px; background:var(--dark); color:white; padding:12px;">完成</button>
         </div>
     </div>
@@ -112,7 +131,8 @@
             {name: '燙青菜', price: 40, category: '小菜'}
         ];
         let cart = [];
-        let currentEditingItem = null;
+        let currentItemData = null;
+        let currentModalQty = 1;
         let currentCategory = '全部';
 
         function init() { renderMenu(); renderEditList(); renderOrder(); }
@@ -137,10 +157,18 @@
         }
 
         function prepareAdd(name, price) {
-            document.getElementById('note-title').innerText = `${name} 備註`;
+            document.getElementById('note-title').innerText = `${name}`;
             document.getElementById('note-input').value = "";
-            currentEditingItem = { name, price };
+            currentModalQty = 1;
+            document.getElementById('modal-qty-num').innerText = currentModalQty;
+            currentItemData = { name, price };
             toggleModal('note-modal');
+        }
+
+        function changeModalQty(delta) {
+            currentModalQty += delta;
+            if (currentModalQty < 1) currentModalQty = 1;
+            document.getElementById('modal-qty-num').innerText = currentModalQty;
         }
 
         function addTag(tag) {
@@ -150,19 +178,43 @@
 
         function confirmNote() {
             const note = document.getElementById('note-input').value;
-            cart.push({ ...currentEditingItem, note });
+            const existingItem = cart.find(item => item.name === currentItemData.name && item.note === note);
+            
+            if (existingItem) {
+                existingItem.qty += currentModalQty;
+            } else {
+                cart.push({ ...currentItemData, note, qty: currentModalQty });
+            }
+            
             renderOrder();
             toggleModal('note-modal');
+        }
+
+        function updateQty(index, delta) {
+            cart[index].qty += delta;
+            if (cart[index].qty <= 0) cart.splice(index, 1);
+            renderOrder();
         }
 
         function renderOrder() {
             const container = document.getElementById('order-items');
             let total = 0;
             container.innerHTML = cart.map((item, index) => {
-                total += item.price;
+                const subtotal = item.price * item.qty;
+                total += subtotal;
                 return `
                 <div class="order-row">
-                    <div class="order-main"><span>${item.name}</span><span>$${item.price}</span></div>
+                    <div class="order-main">
+                        <div style="display:flex; flex-direction:column;">
+                            <span>${item.name} ($${item.price})</span>
+                            <span style="font-size:0.8em; color:#666;">小計: $${subtotal}</span>
+                        </div>
+                        <div class="qty-controls">
+                            <div class="btn-qty" onclick="updateQty(${index}, -1)">-</div>
+                            <span style="min-width:20px; text-align:center;">${item.qty}</span>
+                            <div class="btn-qty" onclick="updateQty(${index}, 1)">+</div>
+                        </div>
+                    </div>
                     ${item.note ? `<div class="order-note">└ 備註：${item.note}</div>` : ''}
                 </div>`;
             }).join('') || '<p style="text-align:center; color:#999; padding:20px;">請點餐...</p>';
