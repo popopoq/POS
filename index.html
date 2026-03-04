@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="小餐館POS">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/924/924514.png">
+
+    <title>小餐館專屬 POS</title>
+    <style>
+        :root { --primary: #007bff; --success: #28a745; --danger: #dc3545; --warning: #ffc107; --dark: #343a40; }
+        body { font-family: -apple-system, "Microsoft JhengHei", sans-serif; margin: 15px; background: #f8f9fa; padding-bottom: 120px; -webkit-tap-highlight-color: transparent; }
+        h2 { text-align: center; color: #333; margin-top: 10px; }
+        
+        /* 菜單區域 */
+        .menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px; }
+        .menu-item { padding: 25px 10px; background: white; border: 2px solid #dee2e6; border-radius: 12px; text-align: center; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .menu-item:active { background: #e9ecef; transform: scale(0.95); }
+        .menu-item b { display: block; font-size: 1.2em; margin-bottom: 5px; }
+        .menu-item span { color: var(--danger); font-weight: bold; }
+
+        /* 點餐清單 */
+        .order-card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); border: 1px solid #eee; }
+        .order-row { padding: 12px 0; border-bottom: 1px dashed #ddd; }
+        .order-main { display: flex; justify-content: space-between; font-weight: bold; font-size: 1.1em; }
+        .order-note { font-size: 0.95em; color: #d63384; padding-left: 10px; margin-top: 6px; font-weight: 500; }
+        .total-section { font-size: 1.8em; text-align: right; margin-top: 20px; color: var(--danger); font-weight: 900; border-top: 2px solid #eee; padding-top: 10px; }
+        
+        /* 彈出視窗 */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; }
+        .modal-content { background: white; margin: 15% auto; padding: 25px; width: 85%; border-radius: 20px; box-sizing: border-box; }
+        .tag-group { display: flex; flex-wrap: wrap; gap: 10px; margin: 15px 0; }
+        .tag { padding: 12px 15px; background: #f0f0f0; border-radius: 10px; font-size: 16px; cursor: pointer; border: 1px solid #ddd; }
+        .tag:active { background: var(--warning); }
+
+        /* 底部控制欄 */
+        .btn-group { position: fixed; bottom: 0; left: 0; right: 0; display: flex; padding: 15px; background: white; gap: 12px; box-shadow: 0 -4px 10px rgba(0,0,0,0.05); }
+        button { border: none; border-radius: 10px; font-size: 18px; font-weight: bold; padding: 18px; cursor: pointer; }
+        .btn-print { background: var(--success); color: white; flex: 2; }
+        .btn-clear { background: #adb5bd; color: white; flex: 1; }
+        .btn-settings { background: #f1f3f5; color: var(--dark); flex: 1; border: 1px solid #ddd; }
+
+        /* 列印專用樣式 */
+        @media print {
+            .btn-group, .menu-grid, h2, .modal, .tag-group, .btn-settings, .btn-clear { display: none !important; }
+            body { margin: 0; padding: 0; background: white; }
+            .order-card { box-shadow: none; border: none; width: 100%; padding: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <h2>🍴 我的小餐館 POS</h2>
+    
+    <div id="menu-display" class="menu-grid"></div>
+
+    <div class="order-card" id="print-area">
+        <h3 style="text-align:center; margin-top:0;">📋 點餐明細</h3>
+        <div id="order-items"></div>
+        <div class="total-section">總金額：$<span id="total-price">0</span></div>
+    </div>
+
+    <div class="btn-group">
+        <button class="btn-settings" onclick="toggleModal('settings-modal')">⚙️</button>
+        <button class="btn-clear" onclick="clearOrder()">清空</button>
+        <button class="btn-print" onclick="window.print()">🖨️ 結帳列印</button>
+    </div>
+
+    <div id="note-modal" class="modal">
+        <div class="modal-content">
+            <h3 id="note-title" style="margin-top:0;">餐點備註</h3>
+            <div class="tag-group">
+                <div class="tag" onclick="addTag('微辣')">🌶️ 微辣</div>
+                <div class="tag" onclick="addTag('小辣')">🌶️🌶️ 小辣</div>
+                <div class="tag" onclick="addTag('大辣')">🥵 大辣</div>
+                <div class="tag" onclick="addTag('不加蔥')">🌿 不加蔥</div>
+                <div class="tag" onclick="addTag('不加沙茶')">🚫 不加沙茶</div>
+            </div>
+            <input type="text" id="note-input" placeholder="其他特殊要求..." style="width:100%; padding:15px; box-sizing:border-box; border:1px solid #ccc; border-radius:8px; font-size:16px;">
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button onclick="toggleModal('note-modal')" style="flex:1; background:#eee;">取消</button>
+                <button onclick="confirmNote()" style="flex:2; background:var(--primary); color:white;">加入</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="settings-modal" class="modal">
+        <div class="modal-content" style="margin: 5% auto; width: 90%; height: 80%; overflow-y: auto;">
+            <h3 style="margin-top:0;">⚙️ 菜單管理</h3>
+            <div id="edit-list"></div>
+            <hr>
+            <h4>新增餐點</h4>
+            <div style="display:flex; gap:5px; margin-bottom:10px;">
+                <input type="text" id="new-name" placeholder="品名" style="flex:2; padding:10px;">
+                <input type="number" id="new-price" placeholder="價格" style="flex:1; padding:10px;">
+            </div>
+            <button onclick="addMenuItem()" style="width:100%; background:var(--primary); color:white; padding:12px;">➕ 新增</button>
+            <button onclick="toggleModal('settings-modal')" style="width:100%; margin-top:25px; background:var(--dark); color:white; padding:12px;">完成</button>
+        </div>
+    </div>
+
+    <script>
+        let menu = JSON.parse(localStorage.getItem('myMenu')) || [
+            {name: '排骨飯', price: 100},
+            {name: '雞腿飯', price: 110},
+            {name: '魯肉飯', price: 40}
+        ];
+        let cart = [];
+        let currentEditingItem = null;
+
+        function init() { renderMenu(); renderEditList(); renderOrder(); }
+
+        function renderMenu() {
+            document.getElementById('menu-display').innerHTML = menu.map(item => `
+                <div class="menu-item" onclick="prepareAdd('${item.name}', ${item.price})">
+                    <b>${item.name}</b><span>$${item.price}</span>
+                </div>
+            `).join('');
+        }
+
+        function prepareAdd(name, price) {
+            document.getElementById('note-title').innerText = `${name} 備註`;
+            document.getElementById('note-input').value = "";
+            currentEditingItem = { name, price };
+            toggleModal('note-modal');
+        }
+
+        function addTag(tag) {
+            let input = document.getElementById('note-input');
+            input.value = input.value ? input.value + ", " + tag : tag;
+        }
+
+        function confirmNote() {
+            const note = document.getElementById('note-input').value;
+            cart.push({ ...currentEditingItem, note });
+            renderOrder();
+            toggleModal('note-modal');
+        }
+
+        function renderOrder() {
+            const container = document.getElementById('order-items');
+            let total = 0;
+            container.innerHTML = cart.map((item, index) => {
+                total += item.price;
+                return `
+                <div class="order-row">
+                    <div class="order-main"><span>${item.name}</span><span>$${item.price}</span></div>
+                    ${item.note ? `<div class="order-note">└ 備註：${item.note}</div>` : ''}
+                </div>`;
+            }).join('') || '<p style="text-align:center; color:#999; padding:20px;">請點餐...</p>';
+            document.getElementById('total-price').innerText = total;
+        }
+
+        function clearOrder() { if(cart.length > 0 && confirm('確定清空？')) { cart = []; renderOrder(); } }
+
+        function toggleModal(id) {
+            const m = document.getElementById(id);
+            m.style.display = m.style.display === 'block' ? 'none' : 'block';
+        }
+
+        function renderEditList() {
+            document.getElementById('edit-list').innerHTML = menu.map((item, i) => `
+                <div style="display:flex; margin-bottom:10px; gap:5px;">
+                    <input type="text" value="${item.name}" onchange="menu[${i}].name=this.value;saveMenu();renderMenu()" style="flex:2; padding:8px;">
+                    <input type="number" value="${item.price}" onchange="menu[${i}].price=parseInt(this.value);saveMenu();renderMenu()" style="flex:1; padding:8px;">
+                    <button onclick="if(confirm('刪除？')){menu.splice(${i},1);saveMenu();renderEditList();renderMenu()}" style="background:var(--danger);color:white;padding:5px 10px;">刪</button>
+                </div>
+            `).join('');
+        }
+
+        function addMenuItem() {
+            const n = document.getElementById('new-name');
+            const p = document.getElementById('new-price');
+            if (n.value && p.value) { menu.push({name: n.value, price: parseInt(p.value)}); saveMenu(); renderMenu(); renderEditList(); n.value=''; p.value=''; }
+        }
+
+        function saveMenu() { localStorage.setItem('myMenu', JSON.stringify(menu)); }
+
+        init();
+    </script>
+</body>
+</html>
