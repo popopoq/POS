@@ -15,11 +15,16 @@
         body { font-family: -apple-system, "Microsoft JhengHei", sans-serif; margin: 15px; background: #f8f9fa; padding-bottom: 120px; -webkit-tap-highlight-color: transparent; }
         h2 { text-align: center; color: #333; margin-top: 10px; }
         
+        /* 分類按鈕 */
+        .category-tabs { display: flex; gap: 8px; margin-bottom: 15px; overflow-x: auto; padding-bottom: 5px; }
+        .tab { padding: 10px 20px; background: white; border: 1px solid #ddd; border-radius: 20px; white-space: nowrap; cursor: pointer; font-weight: bold; }
+        .tab.active { background: var(--primary); color: white; border-color: var(--primary); }
+
         /* 菜單區域 */
         .menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px; }
         .menu-item { padding: 25px 10px; background: white; border: 2px solid #dee2e6; border-radius: 12px; text-align: center; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         .menu-item:active { background: #e9ecef; transform: scale(0.95); }
-        .menu-item b { display: block; font-size: 1.2em; margin-bottom: 5px; }
+        .menu-item b { display: block; font-size: 1.1em; margin-bottom: 5px; }
         .menu-item span { color: var(--danger); font-weight: bold; }
 
         /* 點餐清單 */
@@ -43,9 +48,8 @@
         .btn-clear { background: #adb5bd; color: white; flex: 1; }
         .btn-settings { background: #f1f3f5; color: var(--dark); flex: 1; border: 1px solid #ddd; }
 
-        /* 列印專用樣式 */
         @media print {
-            .btn-group, .menu-grid, h2, .modal, .tag-group, .btn-settings, .btn-clear { display: none !important; }
+            .btn-group, .menu-grid, h2, .modal, .tag-group, .btn-settings, .btn-clear, .category-tabs { display: none !important; }
             body { margin: 0; padding: 0; background: white; }
             .order-card { box-shadow: none; border: none; width: 100%; padding: 0; }
         }
@@ -55,6 +59,13 @@
 
     <h2>🍴 我的小餐館 POS</h2>
     
+    <div class="category-tabs" id="category-tabs">
+        <div class="tab active" onclick="filterMenu('全部')">全部</div>
+        <div class="tab" onclick="filterMenu('主食')">主食</div>
+        <div class="tab" onclick="filterMenu('湯品')">湯品</div>
+        <div class="tab" onclick="filterMenu('小菜')">小菜</div>
+    </div>
+
     <div id="menu-display" class="menu-grid"></div>
 
     <div class="order-card" id="print-area">
@@ -88,14 +99,21 @@
     </div>
 
     <div id="settings-modal" class="modal">
-        <div class="modal-content" style="margin: 5% auto; width: 90%; height: 80%; overflow-y: auto;">
+        <div class="modal-content" style="margin: 5% auto; width: 95%; height: 85%; overflow-y: auto;">
             <h3 style="margin-top:0;">⚙️ 菜單管理</h3>
             <div id="edit-list"></div>
             <hr>
             <h4>新增餐點</h4>
-            <div style="display:flex; gap:5px; margin-bottom:10px;">
-                <input type="text" id="new-name" placeholder="品名" style="flex:2; padding:10px;">
-                <input type="number" id="new-price" placeholder="價格" style="flex:1; padding:10px;">
+            <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:10px;">
+                <div style="display:flex; gap:5px;">
+                    <input type="text" id="new-name" placeholder="品名" style="flex:2; padding:10px;">
+                    <input type="number" id="new-price" placeholder="價格" style="flex:1; padding:10px;">
+                </div>
+                <select id="new-category" style="padding:10px; font-size:16px;">
+                    <option value="主食">主食</option>
+                    <option value="湯品">湯品</option>
+                    <option value="小菜">小菜</option>
+                </select>
             </div>
             <button onclick="addMenuItem()" style="width:100%; background:var(--primary); color:white; padding:12px;">➕ 新增</button>
             <button onclick="toggleModal('settings-modal')" style="width:100%; margin-top:25px; background:var(--dark); color:white; padding:12px;">完成</button>
@@ -104,21 +122,34 @@
 
     <script>
         let menu = JSON.parse(localStorage.getItem('myMenu')) || [
-            {name: '排骨飯', price: 100},
-            {name: '雞腿飯', price: 110},
-            {name: '魯肉飯', price: 40}
+            {name: '排骨飯', price: 100, category: '主食'},
+            {name: '貢丸湯', price: 30, category: '湯品'},
+            {name: '燙青菜', price: 40, category: '小菜'}
         ];
         let cart = [];
         let currentEditingItem = null;
+        let currentCategory = '全部';
 
         function init() { renderMenu(); renderEditList(); renderOrder(); }
 
         function renderMenu() {
-            document.getElementById('menu-display').innerHTML = menu.map(item => `
+            const display = document.getElementById('menu-display');
+            const filtered = currentCategory === '全部' ? menu : menu.filter(item => item.category === currentCategory);
+            
+            display.innerHTML = filtered.map(item => `
                 <div class="menu-item" onclick="prepareAdd('${item.name}', ${item.price})">
                     <b>${item.name}</b><span>$${item.price}</span>
                 </div>
             `).join('');
+        }
+
+        function filterMenu(cat) {
+            currentCategory = cat;
+            document.querySelectorAll('.tab').forEach(t => {
+                t.classList.remove('active');
+                if(t.innerText === cat) t.classList.add('active');
+            });
+            renderMenu();
         }
 
         function prepareAdd(name, price) {
@@ -163,10 +194,19 @@
 
         function renderEditList() {
             document.getElementById('edit-list').innerHTML = menu.map((item, i) => `
-                <div style="display:flex; margin-bottom:10px; gap:5px;">
-                    <input type="text" value="${item.name}" onchange="menu[${i}].name=this.value;saveMenu();renderMenu()" style="flex:2; padding:8px;">
-                    <input type="number" value="${item.price}" onchange="menu[${i}].price=parseInt(this.value);saveMenu();renderMenu()" style="flex:1; padding:8px;">
-                    <button onclick="if(confirm('刪除？')){menu.splice(${i},1);saveMenu();renderEditList();renderMenu()}" style="background:var(--danger);color:white;padding:5px 10px;">刪</button>
+                <div style="background:#f9f9f9; padding:10px; border-radius:8px; margin-bottom:10px; border:1px solid #eee;">
+                    <div style="display:flex; gap:5px; margin-bottom:5px;">
+                        <input type="text" value="${item.name}" onchange="menu[${i}].name=this.value;saveMenu();renderMenu()" style="flex:2; padding:8px;">
+                        <input type="number" value="${item.price}" onchange="menu[${i}].price=parseInt(this.value);saveMenu();renderMenu()" style="flex:1; padding:8px;">
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <select onchange="menu[${i}].category=this.value;saveMenu();renderMenu()" style="padding:5px;">
+                            <option value="主食" ${item.category==='主食'?'selected':''}>主食</option>
+                            <option value="湯品" ${item.category==='湯品'?'selected':''}>湯品</option>
+                            <option value="小菜" ${item.category==='小菜'?'selected':''}>小菜</option>
+                        </select>
+                        <button onclick="if(confirm('刪除？')){menu.splice(${i},1);saveMenu();renderEditList();renderMenu()}" style="background:var(--danger);color:white;padding:5px 15px; border-radius:5px;">刪除</button>
+                    </div>
                 </div>
             `).join('');
         }
@@ -174,7 +214,12 @@
         function addMenuItem() {
             const n = document.getElementById('new-name');
             const p = document.getElementById('new-price');
-            if (n.value && p.value) { menu.push({name: n.value, price: parseInt(p.value)}); saveMenu(); renderMenu(); renderEditList(); n.value=''; p.value=''; }
+            const c = document.getElementById('new-category');
+            if (n.value && p.value) { 
+                menu.push({name: n.value, price: parseInt(p.value), category: c.value}); 
+                saveMenu(); renderMenu(); renderEditList(); 
+                n.value=''; p.value=''; 
+            }
         }
 
         function saveMenu() { localStorage.setItem('myMenu', JSON.stringify(menu)); }
