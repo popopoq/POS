@@ -3,27 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>小餐館 POS - 品項歸類版</title>
+    <title>小餐館 POS - 專業管理版</title>
     <style>
         :root { --primary: #007bff; --success: #28a745; --danger: #dc3545; --warning: #ffc107; --dark: #343a40; --bg: #f4f7f6; }
         body { font-family: -apple-system, "Microsoft JhengHei", sans-serif; margin: 10px; background: var(--bg); padding-bottom: 120px; }
+        
+        /* 選單標籤 */
         .category-tabs { display: flex; gap: 8px; margin-bottom: 15px; }
         .tab { flex: 1; text-align: center; padding: 12px 0; background: white; border: 1px solid #ddd; border-radius: 12px; font-weight: bold; cursor: pointer; }
         .tab.active { background: var(--primary); color: white; border-color: var(--primary); }
         .menu-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
         .menu-item { display: flex; justify-content: space-between; align-items: center; padding: 18px 20px; background: white; border-radius: 12px; cursor: pointer; border: 1px solid #eee; }
+        
+        /* 訂單卡片 */
         .cart-card { background: #fff; padding: 15px; border-radius: 15px; border: 2px solid var(--primary); }
         .order-card { background: white; border-left: 6px solid var(--warning); padding: 15px; border-radius: 10px; margin-bottom: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        
+        /* 彈窗設計 */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; }
         .modal-content { background: white; margin: 3% auto; padding: 20px; width: 88%; border-radius: 15px; max-height: 90vh; overflow-y: auto; }
+        
+        /* 數量備註 */
         .qty-input-group { display: flex; align-items: center; justify-content: center; gap: 20px; margin: 15px 0; }
         .btn-circle { width: 55px; height: 55px; border-radius: 50%; border: 2px solid var(--primary); background: white; color: var(--primary); font-size: 28px; font-weight: bold; }
         .qty-num { font-size: 36px; font-weight: bold; border-bottom: 3px solid #ddd; min-width: 70px; text-align: center; }
         .memo-tags { display: flex; flex-wrap: wrap; gap: 8px; margin: 15px 0; }
         .memo-btn { padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; background: white; font-weight: bold; }
+
+        /* 設定頁面專用 */
+        .admin-cat-section { margin-bottom: 20px; border: 1px solid #eee; border-radius: 8px; overflow: hidden; }
+        .admin-cat-title { background: #eee; padding: 8px 12px; font-weight: bold; font-size: 14px; }
+        .admin-item { display: flex; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid #f9f9f9; background: white; }
+
+        /* 導覽列 */
         .footer-nav { position: fixed; bottom: 0; left: 0; right: 0; background: white; display: flex; border-top: 1px solid #ddd; padding: 10px; z-index: 1000; }
         .footer-nav button { flex: 1; background: none; border: none; font-weight: bold; padding: 10px; font-size: 16px; color: #666; }
         .footer-nav button.active { color: var(--primary); }
+
         @media print {
             body * { visibility: hidden; }
             #print-area, #print-area * { visibility: visible; }
@@ -59,7 +75,6 @@
             <div id="edit-category-tabs" class="category-tabs"></div>
             <div id="edit-menu-display" class="menu-grid" style="max-height: 200px; overflow-y: auto; background: #eee; border-radius: 10px; padding: 10px;"></div>
             <div style="margin-top:15px; border: 2px solid var(--warning); padding: 12px; border-radius: 12px; background: #fffcf0;">
-                <div style="font-weight:bold;">當前清單 (品項已歸類)：</div>
                 <div id="edit-cart-items" style="margin: 10px 0;"></div>
                 <div style="text-align:right; font-size: 1.8em; font-weight: bold; color: var(--danger);">$ <span id="edit-cart-total">0</span></div>
             </div>
@@ -86,22 +101,38 @@
 
     <div id="settings-modal" class="modal">
         <div class="modal-content">
-            <h2 style="margin-top:0;">⚙️ 設定</h2>
-            <div id="admin-menu-list" style="border:1px solid #eee; border-radius:8px; max-height:150px; overflow-y:auto; margin-bottom:10px;"></div>
-            <div style="background:#f9f9f9; padding:10px; border-radius:8px; display:flex; flex-wrap:wrap; gap:5px;">
-                <input type="text" id="new-item-name" placeholder="品名" style="width:48%; padding:8px;">
-                <input type="number" id="new-item-price" placeholder="價格" style="width:48%; padding:8px;">
-                <select id="new-item-cat" style="width:100%; padding:8px;"><option value="主食">主食</option><option value="湯品">湯品</option><option value="小菜">小菜</option></select>
-                <button onclick="addItem()" style="width:100%; padding:10px; background:var(--primary); color:white; border:none; border-radius:5px;">新增</button>
+            <h2 style="margin-top:0;">⚙️ 系統設定</h2>
+            
+            <h3>🍎 菜單分區管理</h3>
+            <div id="admin-menu-list"></div>
+            
+            <div style="background:#f0f7ff; padding:15px; border-radius:10px; border:1px solid var(--primary); margin-top:10px;">
+                <div style="font-weight:bold; margin-bottom:5px;">新增品項：</div>
+                <div style="display:flex; flex-wrap:wrap; gap:5px;">
+                    <input type="text" id="new-item-name" placeholder="品名" style="width:48%; padding:8px;">
+                    <input type="number" id="new-item-price" placeholder="價格" style="width:48%; padding:8px;">
+                    <select id="new-item-cat" style="width:100%; padding:8px;">
+                        <option value="主食">主食</option><option value="湯品">湯品</option><option value="小菜">小菜</option>
+                    </select>
+                    <button onclick="addItem()" style="width:100%; padding:10px; background:var(--primary); color:white; border:none; border-radius:5px; font-weight:bold;">新增至菜單</button>
+                </div>
             </div>
-            <hr>
-            <div id="admin-memo-list" style="border:1px solid #eee; border-radius:8px; max-height:120px; overflow-y:auto; margin-bottom:10px;"></div>
-            <div style="display:flex; gap:5px;"><input type="text" id="new-memo-text" style="flex:1; padding:8px;"><button onclick="addMemo()" style="padding:8px 20px; background:var(--success); color:white; border:none; border-radius:5px;">新增</button></div>
-            <button onclick="closeModal('settings-modal')" style="width:100%; margin-top:30px; padding:15px; background:var(--dark); color:white; border:none; border-radius:10px;">退出</button>
+
+            <hr style="margin:25px 0;">
+
+            <h3>📝 備註快捷鍵管理</h3>
+            <div id="admin-memo-list" style="border:1px solid #eee; border-radius:8px; max-height:120px; overflow-y:auto; margin-bottom:10px; background:#fff;"></div>
+            <div style="display:flex; gap:5px;">
+                <input type="text" id="new-memo-text" placeholder="例如：加辣" style="flex:1; padding:8px;">
+                <button onclick="addMemo()" style="padding:8px 20px; background:var(--success); color:white; border:none; border-radius:5px; font-weight:bold;">新增備註</button>
+            </div>
+
+            <button onclick="closeModal('settings-modal')" style="width:100%; margin-top:30px; padding:15px; background:var(--dark); color:white; border:none; border-radius:10px; font-size:18px; font-weight:bold;">完成並退出</button>
         </div>
     </div>
 
     <div id="print-area"></div>
+
     <div class="footer-nav">
         <button id="nav-order" class="active" onclick="showPage('order')">🔘 點餐</button>
         <button id="nav-queue" onclick="showPage('queue')">📋 等單 (<span id="queue-count">0</span>)</button>
@@ -109,8 +140,12 @@
     </div>
 
     <script>
-        let menu = JSON.parse(localStorage.getItem('myMenu')) || [{name:'肉燥飯', price:35, category:'主食'},{name:'貢丸湯', price:30, category:'湯品'}];
-        let memos = JSON.parse(localStorage.getItem('myMemos')) || ['微辣','❌蔥'];
+        const catWeight = { "主食": 1, "湯品": 2, "小菜": 3 };
+        let menu = JSON.parse(localStorage.getItem('myMenu')) || [
+            {name:'肉燥飯', price:35, category:'主食'},
+            {name:'貢丸湯', price:30, category:'湯品'}
+        ];
+        let memos = JSON.parse(localStorage.getItem('myMemos')) || ['微辣','❌蔥','外帶'];
         let cart = [], orders = JSON.parse(localStorage.getItem('myOrders')) || [];
         let currentItemTarget = null, currentCat = '主食', editingOrderId = null, tempEditCart = [];
 
@@ -125,29 +160,44 @@
 
         function renderTabs(targetId = 'category-tabs-display', onClickFn = 'changeCat') {
             const cats = ['主食', '湯品', '小菜'];
-            document.getElementById(targetId).innerHTML = cats.map(c => `<div class="tab ${c===currentCat?'active':''}" onclick="${onClickFn}('${c}')">${c}</div>`).join('');
+            document.getElementById(targetId).innerHTML = cats.map(c => 
+                `<div class="tab ${c===currentCat?'active':''}" onclick="${onClickFn}('${c}')">${c}</div>`).join('');
         }
         function changeCat(c) { currentCat = c; renderTabs(); renderMenu(c); }
         function changeEditCat(c) { currentCat = c; renderTabs('edit-category-tabs', 'changeEditCat'); renderEditMenu(c); }
 
         function renderMenu(cat) {
             const list = menu.filter(m => m.category === cat);
-            document.getElementById('menu-display').innerHTML = list.map(i => `<div class="menu-item" onclick="openQtyModal('${i.name}', ${i.price}, 'add')"><b>${i.name}</b> <span>$${i.price}</span></div>`).join('');
+            document.getElementById('menu-display').innerHTML = list.map(i => 
+                `<div class="menu-item" onclick="openQtyModal('${i.name}', ${i.price}, '${i.category}', 'add')"><b>${i.name}</b> <span>$${i.price}</span></div>`).join('');
         }
         function renderEditMenu(cat) {
             const list = menu.filter(m => m.category === cat);
-            document.getElementById('edit-menu-display').innerHTML = list.map(i => `<div class="menu-item" style="padding:15px;" onclick="openQtyModal('${i.name}', ${i.price}, 'editAdd')"><b>${i.name}</b> <span>$${i.price}</span></div>`).join('');
+            document.getElementById('edit-menu-display').innerHTML = list.map(i => 
+                `<div class="menu-item" style="padding:15px;" onclick="openQtyModal('${i.name}', ${i.price}, '${i.category}', 'editAdd')"><b>${i.name}</b> <span>$${i.price}</span></div>`).join('');
         }
 
-        function openQtyModal(name, price, mode, idx = null) {
-            currentItemTarget = { name, price, mode, idx };
+        function sortCartItems(targetCart) {
+            targetCart.sort((a, b) => {
+                const weightA = catWeight[a.category] || 99;
+                const weightB = catWeight[b.category] || 99;
+                if (weightA !== weightB) return weightA - weightB;
+                if (a.name !== b.name) return a.name.localeCompare(b.name, 'zh-TW');
+                return (a.memo || "").localeCompare(b.memo || "", 'zh-TW');
+            });
+        }
+
+        function openQtyModal(name, price, category, mode, idx = null) {
+            currentItemTarget = { name, price, category, mode, idx };
             document.getElementById('qty-modal-title').innerText = name;
             document.getElementById('modal-qty-val').innerText = (mode === 'editExist') ? tempEditCart[idx].qty : "1";
             document.getElementById('modal-memo-input').value = (mode === 'editExist') ? tempEditCart[idx].memo : "";
             document.getElementById('qty-confirm-btn').onclick = confirmQtyAction;
-            document.getElementById('memo-tags-display').innerHTML = memos.map(m => `<button class="memo-btn" onclick="addMemoTag('${m}')">${m}</button>`).join('') + `<button class="memo-btn" style="background:#eee;" onclick="document.getElementById('modal-memo-input').value=''">🧹</button>`;
+            document.getElementById('memo-tags-display').innerHTML = memos.map(m => 
+                `<button class="memo-btn" onclick="addMemoTag('${m}')">${m}</button>`).join('') + `<button class="memo-btn" style="background:#eee;" onclick="document.getElementById('modal-memo-input').value=''">🧹</button>`;
             document.getElementById('qty-modal').style.display = 'block';
         }
+
         function addMemoTag(tag) {
             let input = document.getElementById('modal-memo-input');
             input.value = input.value ? input.value + "," + tag : tag;
@@ -157,40 +207,25 @@
             document.getElementById('modal-qty-val').innerText = Math.max(1, v + d);
         }
 
-        // --- 自動合併與「品名歸類排序」邏輯 ---
-        function processCartSorting(targetCart) {
-            // 先依品名排序，品名一樣再依備註排序
-            targetCart.sort((a, b) => {
-                if (a.name !== b.name) return a.name.localeCompare(b.name, 'zh-TW');
-                return a.memo.localeCompare(b.memo, 'zh-TW');
-            });
-        }
-
-        function addToTargetCart(targetCart, newItem) {
-            let existing = targetCart.find(i => i.name === newItem.name && i.memo === newItem.memo);
-            if (existing) {
-                existing.qty += newItem.qty;
-            } else {
-                targetCart.push(newItem);
-            }
-            processCartSorting(targetCart); // 每次加入後自動重新排序歸類
-        }
-
         function confirmQtyAction() {
             const qty = parseInt(document.getElementById('modal-qty-val').innerText);
             const memo = document.getElementById('modal-memo-input').value;
-            const newItem = { name: currentItemTarget.name, price: currentItemTarget.price, qty, memo };
+            const newItem = { name: currentItemTarget.name, price: currentItemTarget.price, category: currentItemTarget.category, qty, memo };
 
             if(currentItemTarget.mode === 'add') {
-                addToTargetCart(cart, newItem);
+                let existing = cart.find(i => i.name === newItem.name && i.memo === newItem.memo);
+                if (existing) existing.qty += newItem.qty; else cart.push(newItem);
+                sortCartItems(cart);
                 renderCart();
             } else if(currentItemTarget.mode === 'editAdd') {
-                addToTargetCart(tempEditCart, newItem);
+                let existing = tempEditCart.find(i => i.name === newItem.name && i.memo === newItem.memo);
+                if (existing) existing.qty += newItem.qty; else tempEditCart.push(newItem);
+                sortCartItems(tempEditCart);
                 renderEditCart();
             } else if(currentItemTarget.mode === 'editExist') {
                 tempEditCart[currentItemTarget.idx].qty = qty;
                 tempEditCart[currentItemTarget.idx].memo = memo;
-                processCartSorting(tempEditCart); // 修改後也重新排序
+                sortCartItems(tempEditCart);
                 renderEditCart();
             }
             closeModal('qty-modal');
@@ -251,7 +286,7 @@
             document.getElementById('edit-cart-items').innerHTML = tempEditCart.map((i, idx) => {
                 total += i.price * i.qty;
                 return `<div style="padding:10px 0; border-bottom:1px solid #ddd; display:flex; justify-content:space-between; align-items:center;">
-                    <div onclick="openQtyModal('${i.name}', ${i.price}, 'editExist', ${idx})" style="flex:1;">
+                    <div onclick="openQtyModal('${i.name}', ${i.price}, '${i.category}', 'editExist', ${idx})" style="flex:1;">
                         <b>${i.name} x ${i.qty}</b> <br><small style="color:red;">${i.memo ? '('+i.memo+')' : ''}</small>
                     </div>
                     <button onclick="tempEditCart.splice(${idx},1);renderEditCart()" style="color:red; border:none; background:none; font-size:22px;">✕</button>
@@ -269,27 +304,61 @@
             closeModal('edit-order-modal');
         }
 
-        function closeEditModal() { if(confirm('放棄修改？')) closeModal('edit-order-modal'); }
         function openSettings() { renderAdminLists(); document.getElementById('settings-modal').style.display = 'block'; }
+        
+        // --- 設定視窗：分區顯示菜單 & 備註管理 ---
         function renderAdminLists() {
-            document.getElementById('admin-menu-list').innerHTML = menu.map((m, i) => `<div style="display:flex; justify-content:space-between; padding:8px;"><span>${m.name}($${m.price})</span><button onclick="deleteItem(${i})" style="color:red; border:none; background:none;">刪除</button></div>`).join('');
-            document.getElementById('admin-memo-list').innerHTML = memos.map((m, i) => `<div style="display:flex; justify-content:space-between; padding:8px;"><span>${m}</span><button onclick="deleteMemo(${i})" style="color:red; border:none; background:none;">刪除</button></div>`).join('');
+            const cats = ["主食", "湯品", "小菜"];
+            let menuHtml = "";
+            cats.forEach(c => {
+                const items = menu.filter(m => m.category === c);
+                menuHtml += `<div class="admin-cat-section">
+                    <div class="admin-cat-title">${c} 類</div>
+                    ${items.map(m => {
+                        const originalIdx = menu.indexOf(m);
+                        return `<div class="admin-item">
+                            <span>${m.name} ($${m.price})</span>
+                            <button onclick="deleteItem(${originalIdx})" style="color:red; border:none; background:none; font-weight:bold;">刪除</button>
+                        </div>`;
+                    }).join('') || '<div style="padding:10px; color:gray; font-size:12px;">無品項</div>'}
+                </div>`;
+            });
+            document.getElementById('admin-menu-list').innerHTML = menuHtml;
+
+            // 備註管理列表
+            document.getElementById('admin-memo-list').innerHTML = memos.map((m, i) => 
+                `<div class="admin-item">
+                    <span>${m}</span>
+                    <button onclick="deleteMemo(${i})" style="color:red; border:none; background:none; font-weight:bold;">刪除</button>
+                </div>`).join('');
         }
-        function addItem() { const n = document.getElementById('new-item-name').value, p = document.getElementById('new-item-price').value, c = document.getElementById('new-item-cat').value; if(n && p) { menu.push({name:n, price:parseInt(p), category:c}); saveAndRefresh(); } }
-        function addMemo() { const t = document.getElementById('new-memo-text').value; if(t) { memos.push(t); saveAndRefresh(); } }
-        function deleteItem(i) { menu.splice(i, 1); saveAndRefresh(); }
+
+        function addItem() { 
+            const n = document.getElementById('new-item-name').value, p = document.getElementById('new-item-price').value, c = document.getElementById('new-item-cat').value; 
+            if(n && p) { menu.push({name:n, price:parseInt(p), category:c}); saveAndRefresh(); document.getElementById('new-item-name').value=""; document.getElementById('new-item-price').value=""; } 
+        }
+        function deleteItem(i) { if(confirm('確定刪除此品項？')) { menu.splice(i, 1); saveAndRefresh(); } }
+        function addMemo() { const t = document.getElementById('new-memo-text').value; if(t) { memos.push(t); saveAndRefresh(); document.getElementById('new-memo-text').value=""; } }
         function deleteMemo(i) { memos.splice(i, 1); saveAndRefresh(); }
-        function saveAndRefresh() { localStorage.setItem('myMenu', JSON.stringify(menu)); localStorage.setItem('myMemos', JSON.stringify(memos)); renderAdminLists(); renderMenu(currentCat); }
+        function saveAndRefresh() { 
+            localStorage.setItem('myMenu', JSON.stringify(menu)); 
+            localStorage.setItem('myMemos', JSON.stringify(memos));
+            renderAdminLists(); renderMenu(currentCat); 
+        }
+
         function updateStatus(id, s) { orders.find(o=>o.id===id).status = s; localStorage.setItem('myOrders', JSON.stringify(orders)); renderQueue(); }
-        function deleteOrder(id) { if(confirm('刪除？')) { orders = orders.filter(o=>o.id!==id); localStorage.setItem('myOrders', JSON.stringify(orders)); renderQueue(); } }
+        function deleteOrder(id) { if(confirm('刪除訂單？')) { orders = orders.filter(o=>o.id!==id); localStorage.setItem('myOrders', JSON.stringify(orders)); renderQueue(); } }
         function printOrder(id) {
             const o = orders.find(x => x.id === id);
             const p = document.getElementById('print-area');
-            // 列印時也確保品項歸類排序
-            processCartSorting(o.items);
-            p.innerHTML = `<div class="print-title">收據</div><div class="print-line"></div><div>${o.name} / ${o.time}</div><div class="print-line"></div>${o.items.map(i => `<div>${i.name} x ${i.qty}</div>${i.memo ? `<div>> ${i.memo}</div>` : ''}`).join('')}<div class="print-line"></div><div style="text-align:right;">總計: $${o.total}</div><div class="print-gap"></div>`;
+            sortCartItems(o.items);
+            p.innerHTML = `<div class="print-title">餐點收據</div><div class="print-line"></div>
+                <div>客戶: ${o.name} / ${o.time}</div><div class="print-line"></div>
+                ${o.items.map(i => `<div>${i.name} x ${i.qty}</div>${i.memo ? `<div>> ${i.memo}</div>` : ''}`).join('')}
+                <div class="print-line"></div><div style="text-align:right;">總計: $${o.total}</div><div class="print-gap"></div>`;
             window.print();
         }
+        function closeEditModal() { if(confirm('放棄修改？')) closeModal('edit-order-modal'); }
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
         init();
     </script>
