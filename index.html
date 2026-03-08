@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>品味餐館 POS</title>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     
     <link rel="apple-touch-icon" href="logo.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -34,14 +35,17 @@
         .admin-header::after { content: "▼"; font-size: 12px; color: #999; }
 
         .sub-admin-section { border: 1px solid #eee; border-radius: 8px; margin-bottom: 8px; }
-        .sub-admin-header { background: #ececec; padding: 10px; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+        .sub-admin-header { background: #ececec; padding: 10px; font-weight: bold; cursor: default; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
         .sub-admin-content { display: none; background: white; padding: 5px; }
         .sub-admin-section.active .sub-admin-content { display: block; }
+
+        /* 拖曳手把 */
+        .sort-handle { cursor: grab; padding: 5px 15px 5px 5px; color: #ccc; font-size: 20px; }
 
         /* 訂單與按鈕 */
         .order-card { background: white; border-left: 6px solid var(--warning); padding: 15px; border-radius: 10px; margin-bottom: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .cart-card { background: #fff; padding: 15px; border-radius: 15px; border: 2px solid var(--primary); }
-        .memo-btn { padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; background: white; font-weight: bold; }
+        .memo-btn { padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; background: white; font-weight: bold; display: inline-flex; align-items: center; }
         .btn-circle { width: 55px; height: 55px; border-radius: 50%; border: 2px solid var(--primary); background: white; color: var(--primary); font-size: 28px; font-weight: bold; }
         
         /* 彈窗內輸入框樣式 */
@@ -125,6 +129,7 @@
                                 <option value="主食">主食</option>
                                 <option value="湯品">湯品</option>
                                 <option value="小菜">小菜</option>
+                                <option value="其他">其他</option>
                             </select>
                             <button onclick="addMenuItem()" style="width:100%; padding:10px; background:var(--primary); color:white; border:none; border-radius:5px; font-weight:bold;">新增至菜單</button>
                         </div>
@@ -140,7 +145,7 @@
                         <input type="text" id="new-memo-input" placeholder="新標籤" style="flex:1; padding:8px; border:1px solid #ddd; border-radius:5px;">
                         <button onclick="addMemoLabel()" style="padding:8px 15px; background:var(--primary); color:white; border:none; border-radius:5px;">新增</button>
                     </div>
-                    <div id="admin-memo-list" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+                    <div id="admin-memo-drag-list" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
                 </div>
             </div>
 
@@ -157,7 +162,10 @@
     </div>
 
     <script>
-        const catWeight = { "主食": 1, "湯品": 2, "小菜": 3 };
+        // 核心分類與權重
+        const categories = ['主食','湯品','小菜','其他'];
+        const catWeight = { "主食": 1, "湯品": 2, "小菜": 3, "其他": 4 };
+        
         let menu = JSON.parse(localStorage.getItem('myMenu')) || [{name:'肉燥飯', price:35, category:'主食'}];
         let memos = JSON.parse(localStorage.getItem('myMemos')) || ['微辣','❌蔥','外帶','加辣'];
         let cart = [], orders = JSON.parse(localStorage.getItem('myOrders')) || [];
@@ -174,18 +182,40 @@
         }
         function switchQueueTab(t) { queueTab = t; renderQueue(); }
         function toggleAdminSection(header) { header.parentElement.classList.toggle('active'); }
-        function toggleSubAdmin(header) { header.parentElement.classList.toggle('active'); }
+        
+        // 修改：分類格子點擊無效，需點按鈕
+        function toggleSubAdmin(btn) { btn.closest('.sub-admin-section').classList.toggle('active'); }
+
+        // --- 智慧自動排列演算法 ---
+        function autoSortMenu() {
+            menu.sort((a, b) => {
+                // 1. 分類排序
+                if (a.category !== b.category) return catWeight[a.category] - catWeight[b.category];
+                // 2. 關鍵字排序 (炒飯 > 炒麵 > 其他)
+                const getKeywordRank = (name) => {
+                    if (name.includes('炒飯')) return 1;
+                    if (name.includes('炒麵')) return 2;
+                    return 3;
+                };
+                const rankA = getKeywordRank(a.name);
+                const rankB = getKeywordRank(b.name);
+                if (rankA !== rankB) return rankA - rankB;
+                // 3. 相似名稱靠攏 (字串排序)
+                return a.name.localeCompare(b.name, 'zh-Hant');
+            });
+            localStorage.setItem('myMenu', JSON.stringify(menu));
+        }
 
         // --- 點餐功能 ---
         function renderTabs() {
-            document.getElementById('category-tabs-display').innerHTML = ['主食','湯品','小菜'].map(c => `<div class="tab ${c===currentCat?'active':''}" onclick="changeCat('${c}')">${c}</div>`).join('');
+            document.getElementById('category-tabs-display').innerHTML = categories.map(c => `<div class="tab ${c===currentCat?'active':''}" onclick="changeCat('${c}')">${c}</div>`).join('');
         }
         function changeCat(c) { currentCat = c; renderTabs(); renderMenu(c); }
         function renderMenu(cat) {
             document.getElementById('menu-display').innerHTML = menu.filter(m => m.category === cat).map(i => `<div class="menu-item" onclick="openQtyModal('${i.name}', ${i.price}, '${i.category}')"><b>${i.name}</b> <span>$${i.price}</span></div>`).join('');
         }
 
-        // 修改：開啟彈窗 (可新增或修改備註)
+        // 彈窗功能 (完整保留原始修改邏輯)
         function openQtyModal(name, price, category, editIdx = null) {
             editingCartIdx = editIdx;
             currentItemTarget = { name, price, category };
@@ -215,17 +245,13 @@
         function confirmQtyAction() {
             const qty = parseInt(document.getElementById('modal-qty-val').value) || 1;
             const memo = document.getElementById('modal-memo-input').value;
-            
             if (editingCartIdx !== null) {
-                // 修改現有品項
                 cart[editingCartIdx].qty = qty;
                 cart[editingCartIdx].memo = memo;
             } else {
-                // 新增品項
                 const ex = cart.find(i=>i.name===currentItemTarget.name && i.memo===memo);
                 if(ex) ex.qty += qty; else cart.push({...currentItemTarget, qty, memo});
             }
-            
             cart.sort((a,b) => (catWeight[a.category]||99)-(catWeight[b.category]||99));
             renderCart(); closeModal('qty-modal');
         }
@@ -257,7 +283,7 @@
             showPage('queue');
         }
 
-        // --- 訂單與結算 ---
+        // --- 訂單與結算 (完整保留原始修改邏輯) ---
         function renderQueue() {
             const list = orders.filter(o => o.status === queueTab);
             document.getElementById('daily-total-display').innerText = `今日累計: $${orders.filter(o=>o.status==='done').reduce((sum,o)=>sum+parseInt(o.total),0)}`;
@@ -278,7 +304,6 @@
                 </div>`).join('');
         }
 
-        // 恢復：等單區整筆修改功能
         function editOrder(id) {
             if(cart.length > 0 && !confirm('購物車已有東西，修改將會覆蓋，確定？')) return;
             const o = orders.find(x => x.id === id);
@@ -318,7 +343,103 @@
             p.innerHTML = "";
         }
 
-        // --- 歷史紀錄功能 ---
+        // --- 管理功能 (新增拖曳與手動排列) ---
+        function openSettings() {
+            renderHistoryList();
+            renderAdminMenuLists();
+            renderAdminMemoList();
+            document.getElementById('settings-modal').style.display = 'block';
+        }
+
+        function renderAdminMenuLists() {
+            let h = ""; 
+            categories.forEach(c => { 
+                let it = menu.filter(m=>m.category===c); 
+                h += `
+                <div class="sub-admin-section">
+                    <div class="sub-admin-header">
+                        <span>${c}類 (${it.length})</span>
+                        <button onclick="toggleSubAdmin(this)" style="padding:4px 8px; font-size:12px; background:#666; color:white; border:none; border-radius:4px;">展開/收合</button>
+                    </div>
+                    <div class="sub-admin-content" id="list-${c}">
+                        ${it.map(m=>{
+                            return `<div class="admin-sort-item" data-name="${m.name}" style="padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+                                <div><span class="sort-handle">☰</span>${m.name}($${m.price})</div>
+                                <button onclick="deleteMenuItemByName('${m.name}', '${m.category}')" style="color:red; border:1px solid red; border-radius:5px; padding:2px 8px; font-size:12px;">刪除</button>
+                            </div>`
+                        }).join('') || '無項目'}
+                    </div>
+                </div>`;
+            });
+            document.getElementById('admin-menu-list').innerHTML = h;
+
+            // 初始化分類內拖曳
+            categories.forEach(c => {
+                const el = document.getElementById('list-' + c);
+                if(el) {
+                    new Sortable(el, {
+                        handle: '.sort-handle',
+                        animation: 150,
+                        onEnd: function() {
+                            const sortedNames = Array.from(el.querySelectorAll('.admin-sort-item')).map(i => i.getAttribute('data-name'));
+                            const otherItems = menu.filter(m => m.category !== c);
+                            const currentCatItems = sortedNames.map(name => menu.find(m => m.name === name && m.category === c));
+                            menu = [...otherItems, ...currentCatItems];
+                            localStorage.setItem('myMenu', JSON.stringify(menu));
+                            renderMenu(currentCat);
+                        }
+                    });
+                }
+            });
+        }
+
+        function addMenuItem() {
+            const n = document.getElementById('new-item-name').value.trim();
+            const p = document.getElementById('new-item-price').value;
+            const c = document.getElementById('new-item-cat').value;
+            if(n && p) {
+                menu.push({name:n, price:parseInt(p), category:c});
+                autoSortMenu(); // 新增時自動觸發智慧排序
+                document.getElementById('new-item-name').value = "";
+                document.getElementById('new-item-price').value = "";
+                renderAdminMenuLists(); renderMenu(currentCat);
+            }
+        }
+
+        function deleteMenuItemByName(name, cat) {
+            if(confirm('確定刪除此品項？')){
+                menu = menu.filter(m => !(m.name === name && m.category === cat));
+                localStorage.setItem('myMenu', JSON.stringify(menu));
+                renderAdminMenuLists(); renderMenu(currentCat);
+            }
+        }
+
+        // 備註標籤管理 (支援拖曳)
+        function renderAdminMemoList() {
+            const container = document.getElementById('admin-memo-drag-list');
+            container.innerHTML = memos.map((m,idx) => `
+                <div class="memo-item" data-id="${m}" style="display:inline-flex; align-items:center; background:white; border:1px solid #ddd; padding:8px; border-radius:8px;">
+                    <span class="sort-handle" style="font-size:14px; padding-right:5px;">☰</span>
+                    ${m}
+                    <span onclick="deleteMemoLabel(${idx})" style="color:red; cursor:pointer; margin-left:8px; font-weight:bold;">✕</span>
+                </div>`).join('');
+
+            new Sortable(container, {
+                handle: '.sort-handle',
+                animation: 150,
+                onEnd: function() {
+                    memos = Array.from(container.querySelectorAll('.memo-item')).map(i => i.getAttribute('data-id'));
+                    localStorage.setItem('myMemos', JSON.stringify(memos));
+                }
+            });
+        }
+
+        function addMemoLabel() {
+            const i = document.getElementById('new-memo-input');
+            if(i.value.trim()){ memos.push(i.value.trim()); i.value=''; localStorage.setItem('myMemos', JSON.stringify(memos)); renderAdminMemoList(); }
+        }
+        function deleteMemoLabel(idx) { memos.splice(idx,1); localStorage.setItem('myMemos', JSON.stringify(memos)); renderAdminMemoList(); }
+
         function renderHistoryList() {
             document.getElementById('history-list').innerHTML = history.map((h, idx) => `
                 <div style="padding:10px 0; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
@@ -326,63 +447,8 @@
                     <button onclick="deleteHistoryItem(${idx})" style="color:red; border:1px solid red; background:none; padding:4px 8px; border-radius:5px; font-size:12px;">刪除</button>
                 </div>`).join('') || '<p style="text-align:center; color:gray;">尚無歷史紀錄</p>';
         }
-        function deleteHistoryItem(idx) {
-            if(confirm('確定要刪除這筆歷史紀錄嗎？')) {
-                history.splice(idx, 1);
-                localStorage.setItem('myHistory', JSON.stringify(history));
-                renderHistoryList();
-            }
-        }
-        function clearAllHistory() {
-            if(confirm('⚠️ 警告：這將會永久清空「所有」歷史營收紀錄！確定嗎？')) {
-                history = [];
-                localStorage.setItem('myHistory', JSON.stringify(history));
-                renderHistoryList();
-            }
-        }
-
-        // --- 管理菜單與標籤 ---
-        function openSettings() {
-            renderHistoryList();
-            renderAdminMenuLists();
-            renderAdminMemoList();
-            document.getElementById('settings-modal').style.display = 'block';
-        }
-        function renderAdminMenuLists() {
-            let h = ""; 
-            ['主食','湯品','小菜'].forEach(c => { 
-                let it = menu.filter(m=>m.category===c); 
-                h += `
-                <div class="sub-admin-section">
-                    <div class="sub-admin-header" onclick="toggleSubAdmin(this)">${c}類 (${it.length})</div>
-                    <div class="sub-admin-content">
-                        ${it.map(m=>{let idx=menu.indexOf(m);return `<div style="padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;"><span>${m.name}($${m.price})</span><button onclick="deleteMenuItem(${idx})" style="color:red; border:1px solid red; border-radius:5px; padding:2px 8px; font-size:12px;">刪除</button></div>`}).join('') || '無項目'}
-                    </div>
-                </div>`;
-            });
-            document.getElementById('admin-menu-list').innerHTML = h;
-        }
-        function addMenuItem() {
-            const n = document.getElementById('new-item-name').value.trim();
-            const p = document.getElementById('new-item-price').value;
-            const c = document.getElementById('new-item-cat').value;
-            if(n && p) {
-                menu.push({name:n, price:parseInt(p), category:c});
-                localStorage.setItem('myMenu', JSON.stringify(menu));
-                document.getElementById('new-item-name').value = "";
-                document.getElementById('new-item-price').value = "";
-                renderAdminMenuLists(); renderMenu(currentCat);
-            }
-        }
-        function deleteMenuItem(i) { if(confirm('確定刪除此品項？')){menu.splice(i,1); localStorage.setItem('myMenu',JSON.stringify(menu)); renderAdminMenuLists(); renderMenu(currentCat);}}
-        function renderAdminMemoList() {
-            document.getElementById('admin-memo-list').innerHTML = memos.map((m,idx) => `<div class=\"memo-btn\">${m} <span onclick=\"deleteMemoLabel(${idx})\" style=\"color:red; cursor:pointer; margin-left:5px;\">✕</span></div>`).join('');
-        }
-        function addMemoLabel() {
-            const i = document.getElementById('new-memo-input');
-            if(i.value.trim()){ memos.push(i.value.trim()); i.value=''; localStorage.setItem('myMemos', JSON.stringify(memos)); renderAdminMemoList(); }
-        }
-        function deleteMemoLabel(idx) { memos.splice(idx,1); localStorage.setItem('myMemos', JSON.stringify(memos)); renderAdminMemoList(); }
+        function deleteHistoryItem(idx) { if(confirm('確定要刪除這筆歷史紀錄嗎？')) { history.splice(idx, 1); localStorage.setItem('myHistory', JSON.stringify(history)); renderHistoryList(); } }
+        function clearAllHistory() { if(confirm('⚠️ 警告：這將會永久清空「所有」歷史營收紀錄！確定嗎？')) { history = []; localStorage.setItem('myHistory', JSON.stringify(history)); renderHistoryList(); } }
         function closeModal(id) { document.getElementById(id).style.display='none'; }
         
         init();
