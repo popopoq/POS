@@ -26,7 +26,7 @@
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; }
         .modal-content { background: white; margin: 3% auto; padding: 20px; width: 88%; border-radius: 15px; max-height: 90vh; overflow-y: auto; }
         
-        /* 管理區摺疊樣式 */
+        /* 管理區摺疊樣式 (分類展開/收合) */
         .admin-section { border: 1px solid #ddd; border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
         .admin-header { background: #f8f9fa; padding: 15px; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
         .admin-content { display: none; background: white; padding: 10px; border-top: 1px solid #eee; }
@@ -53,13 +53,6 @@
         .footer-nav { position: fixed; bottom: 0; left: 0; right: 0; background: white; display: flex; border-top: 1px solid #ddd; padding: 10px; z-index: 1000; }
         .footer-nav button { flex: 1; background: none; border: none; font-weight: bold; padding: 10px; font-size: 16px; color: #666; }
         .footer-nav button.active { color: var(--primary); }
-
-        /* iOS 列印修復：採用直接顯隱方式，防止預覽空白 */
-        @media print {
-            body > *:not(#print-area) { display: none !important; }
-            #print-area { position: absolute; left: 0; top: 0; width: 100%; visibility: visible !important; display: block !important; color: black; font-size: 18px; }
-            @page { margin: 0; }
-        }
     </style>
 </head>
 <body>
@@ -151,8 +144,6 @@
         </div>
     </div>
 
-    <div id="print-area"></div>
-
     <div class="footer-nav">
         <button id="nav-order" class="active" onclick="showPage('order')">🔘 點餐</button>
         <button id="nav-queue" onclick="showPage('queue')">📋 等單 (<span id="queue-count">0</span>)</button>
@@ -160,7 +151,6 @@
     </div>
 
     <script>
-        // 固定分類順序
         const categories = ['主食','湯品','小菜','其他'];
         const catWeight = { "主食": 1, "湯品": 2, "小菜": 3, "其他": 4 };
         
@@ -182,7 +172,7 @@
         function toggleAdminSection(header) { header.parentElement.classList.toggle('active'); }
         function toggleSubAdmin(btn) { btn.closest('.sub-admin-section').classList.toggle('active'); }
 
-        // --- 智慧自動排列演算法 ---
+        // --- 智慧自動排列 ---
         function autoSortMenu() {
             menu.sort((a, b) => {
                 if (a.category !== b.category) return catWeight[a.category] - catWeight[b.category];
@@ -199,7 +189,7 @@
             localStorage.setItem('myMenu', JSON.stringify(menu));
         }
 
-        // --- 點餐與彈窗功能 ---
+        // --- 點餐功能 ---
         function renderTabs() {
             document.getElementById('category-tabs-display').innerHTML = categories.map(c => `<div class="tab ${c===currentCat?'active':''}" onclick="changeCat('${c}')">${c}</div>`).join('');
         }
@@ -263,7 +253,7 @@
             localStorage.setItem('myOrders', JSON.stringify(orders)); cart = []; renderCart(); document.getElementById('cust-name').value = ""; showPage('queue');
         }
 
-        // --- 訂單排隊與歷史紀錄 ---
+        // --- 訂單等單與修改按鈕 ---
         function renderQueue() {
             const list = orders.filter(o => o.status === queueTab);
             document.getElementById('daily-total-display').innerText = `今日累計: $${orders.filter(o=>o.status==='done').reduce((sum,o)=>sum+parseInt(o.total),0)}`;
@@ -298,30 +288,53 @@
 
         function updateStatus(id, s) { let o=orders.find(o=>o.id===id); if(o) o.status=s; localStorage.setItem('myOrders', JSON.stringify(orders)); renderQueue(); }
         function deleteOrder(id) { if(confirm('刪除訂單？')){orders=orders.filter(o=>o.id!==id);localStorage.setItem('myOrders',JSON.stringify(orders));renderQueue();}}
-        
-        function dailySettlement() {
-            const total = orders.filter(o=>o.status==='done').reduce((sum,o)=>sum+parseInt(o.total),0);
-            if(total===0) return;
-            if(confirm(`結算今日營收 $${total}？`)){
-                history.unshift({ date: new Date().toLocaleDateString(), amount: total });
-                orders = orders.filter(o=>o.status!=='done');
-                localStorage.setItem('myHistory', JSON.stringify(history));
-                localStorage.setItem('myOrders', JSON.stringify(orders));
-                renderQueue();
-            }
-        }
 
+        // --- 核心修正：iOS 新視窗列印法 ---
         function printOrder(id) {
             const o = orders.find(x => x.id === id);
             const nowTime = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-            const p = document.getElementById('print-area');
-            const nameHeader = o.name ? `<div style="display:flex; justify-content:space-between; font-size:18px; font-weight:bold;"><span>${o.name}</span><span>${nowTime}</span></div>` 
-                                      : `<div style="text-align:right; font-size:18px; font-weight:bold;">${nowTime}</div>`;
-            p.innerHTML = `<div style="text-align:center; font-size:24px; font-weight:bold;">品味餐館</div><hr>${nameHeader}<hr>${o.items.map(i => `<div style="font-size:18px; margin:3px 0;">• ${i.name} x ${i.qty}</div>${i.memo ? `<div style="padding-left:15px;">> ${i.memo}</div>` : ''}`).join('')}<hr><div style="text-align:right; font-size:22px; font-weight:bold;">總計: $${o.total}</div>`;
-            window.print(); p.innerHTML = "";
+            
+            const printHTML = `
+                <html>
+                <head>
+                    <title>品味餐館單據</title>
+                    <style>
+                        body { font-family: sans-serif; padding: 10px; color: black; line-height: 1.4; }
+                        .title { text-align: center; font-size: 26px; font-weight: bold; }
+                        .info { display: flex; justify-content: space-between; font-size: 20px; margin: 10px 0; font-weight: bold; }
+                        .item { font-size: 20px; margin: 8px 0; font-weight: bold; }
+                        .memo { padding-left: 20px; font-size: 18px; font-weight: normal; }
+                        .total { text-align: right; font-size: 24px; font-weight: bold; margin-top: 20px; }
+                        hr { border: 0; border-top: 1px solid black; }
+                    </style>
+                </head>
+                <body>
+                    <div class="title">品味餐館</div>
+                    <hr>
+                    <div class="info"><span>👤 ${o.name || '現場客'}</span><span>🕒 ${nowTime}</span></div>
+                    <hr>
+                    ${o.items.map(i => `<div class="item">• ${i.name} x ${i.qty}</div>${i.memo ? `<div class="memo">> ${i.memo}</div>` : ''}`).join('')}
+                    <hr>
+                    <div class="total">總計: $${o.total}</div>
+                    <script>
+                        window.onload = function() {
+                            window.print();
+                            setTimeout(function() { window.close(); }, 500);
+                        };
+                    <\/script>
+                </body>
+                </html>`;
+
+            const printWindow = window.open('', '_blank');
+            if (printWindow) {
+                printWindow.document.write(printHTML);
+                printWindow.document.close();
+            } else {
+                alert('請允許開啟彈出式視窗以進行列印');
+            }
         }
 
-        // --- 管理介面 (新增拖曳功能) ---
+        // --- 管理與歷史紀錄 ---
         function openSettings() { renderHistoryList(); renderAdminMenuLists(); renderAdminMemoList(); document.getElementById('settings-modal').style.display = 'block'; }
 
         function renderAdminMenuLists() {
@@ -411,8 +424,20 @@
         }
         function deleteHistoryItem(idx) { if(confirm('確定要刪除這筆歷史紀錄嗎？')) { history.splice(idx, 1); localStorage.setItem('myHistory', JSON.stringify(history)); renderHistoryList(); } }
         function clearAllHistory() { if(confirm('⚠️ 警告：這將會永久清空「所有」歷史營收紀錄！確定嗎？')) { history = []; localStorage.setItem('myHistory', JSON.stringify(history)); renderHistoryList(); } }
-        function closeModal(id) { document.getElementById(id).style.display='none'; }
         
+        function dailySettlement() {
+            const total = orders.filter(o=>o.status==='done').reduce((sum,o)=>sum+parseInt(o.total),0);
+            if(total===0) return;
+            if(confirm(`結算今日營收 $${total}？`)){
+                history.unshift({ date: new Date().toLocaleDateString(), amount: total });
+                orders = orders.filter(o=>o.status!=='done');
+                localStorage.setItem('myHistory', JSON.stringify(history));
+                localStorage.setItem('myOrders', JSON.stringify(orders));
+                renderQueue();
+            }
+        }
+
+        function closeModal(id) { document.getElementById(id).style.display='none'; }
         init();
     </script>
 </body>
