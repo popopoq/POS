@@ -16,8 +16,8 @@
         body { font-family: -apple-system, "Microsoft JhengHei", sans-serif; margin: 10px; background: var(--bg); padding-bottom: 120px; }
         
         /* 基礎 UI */
-        .category-tabs { display: flex; gap: 8px; margin-bottom: 15px; }
-        .tab { flex: 1; text-align: center; padding: 12px 0; background: white; border: 1px solid #ddd; border-radius: 12px; font-weight: bold; cursor: pointer; }
+        .category-tabs { display: flex; gap: 8px; margin-bottom: 15px; overflow-x: auto; padding-bottom: 5px; }
+        .tab { flex: 0 0 calc(20% - 8px); min-width: 70px; text-align: center; padding: 12px 0; background: white; border: 1px solid #ddd; border-radius: 12px; font-weight: bold; cursor: pointer; white-space: nowrap; }
         .tab.active { background: var(--primary); color: white; border-color: var(--primary); }
         .menu-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
         .menu-item { display: flex; justify-content: space-between; align-items: center; padding: 18px 20px; background: white; border-radius: 12px; cursor: pointer; border: 1px solid #eee; }
@@ -26,7 +26,7 @@
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; }
         .modal-content { background: white; margin: 3% auto; padding: 20px; width: 88%; border-radius: 15px; max-height: 90vh; overflow-y: auto; }
         
-        /* 管理區摺疊樣式 (分類展開/收合) */
+        /* 管理區樣式 */
         .admin-section { border: 1px solid #ddd; border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
         .admin-header { background: #f8f9fa; padding: 15px; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
         .admin-content { display: none; background: white; padding: 10px; border-top: 1px solid #eee; }
@@ -121,6 +121,7 @@
                                 <option value="湯品">湯品</option>
                                 <option value="小菜">小菜</option>
                                 <option value="其他">其他</option>
+                                <option value="飲料">飲料</option>
                             </select>
                             <button onclick="addMenuItem()" style="width:100%; padding:10px; background:var(--primary); color:white; border:none; border-radius:5px; font-weight:bold;">新增至菜單</button>
                         </div>
@@ -151,8 +152,9 @@
     </div>
 
     <script>
-        const categories = ['主食','湯品','小菜','其他'];
-        const catWeight = { "主食": 1, "湯品": 2, "小菜": 3, "其他": 4 };
+        // 設定分類順序：飲料排在最後
+        const categories = ['主食','湯品','小菜','其他','飲料'];
+        const catWeight = { "主食": 1, "湯品": 2, "小菜": 3, "其他": 4, "飲料": 5 };
         
         let menu = JSON.parse(localStorage.getItem('myMenu')) || [{name:'肉燥飯', price:35, category:'主食'}];
         let memos = JSON.parse(localStorage.getItem('myMemos')) || ['微辣','❌蔥','外帶','加辣'];
@@ -172,7 +174,6 @@
         function toggleAdminSection(header) { header.parentElement.classList.toggle('active'); }
         function toggleSubAdmin(btn) { btn.closest('.sub-admin-section').classList.toggle('active'); }
 
-        // --- 智慧自動排列 ---
         function autoSortMenu() {
             menu.sort((a, b) => {
                 if (a.category !== b.category) return catWeight[a.category] - catWeight[b.category];
@@ -189,7 +190,6 @@
             localStorage.setItem('myMenu', JSON.stringify(menu));
         }
 
-        // --- 點餐功能 ---
         function renderTabs() {
             document.getElementById('category-tabs-display').innerHTML = categories.map(c => `<div class="tab ${c===currentCat?'active':''}" onclick="changeCat('${c}')">${c}</div>`).join('');
         }
@@ -253,7 +253,6 @@
             localStorage.setItem('myOrders', JSON.stringify(orders)); cart = []; renderCart(); document.getElementById('cust-name').value = ""; showPage('queue');
         }
 
-        // --- 訂單等單與修改按鈕 ---
         function renderQueue() {
             const list = orders.filter(o => o.status === queueTab);
             document.getElementById('daily-total-display').innerText = `今日累計: $${orders.filter(o=>o.status==='done').reduce((sum,o)=>sum+parseInt(o.total),0)}`;
@@ -289,7 +288,6 @@
         function updateStatus(id, s) { let o=orders.find(o=>o.id===id); if(o) o.status=s; localStorage.setItem('myOrders', JSON.stringify(orders)); renderQueue(); }
         function deleteOrder(id) { if(confirm('刪除訂單？')){orders=orders.filter(o=>o.id!==id);localStorage.setItem('myOrders',JSON.stringify(orders));renderQueue();}}
 
-        // --- 核心修正：iOS 新視窗列印法 ---
         function printOrder(id) {
             const o = orders.find(x => x.id === id);
             const nowTime = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
@@ -334,7 +332,6 @@
             }
         }
 
-        // --- 管理與歷史紀錄 ---
         function openSettings() { renderHistoryList(); renderAdminMenuLists(); renderAdminMemoList(); document.getElementById('settings-modal').style.display = 'block'; }
 
         function renderAdminMenuLists() {
