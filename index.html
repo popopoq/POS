@@ -39,6 +39,10 @@
         .sub-admin-content { display: none; background: white; padding: 5px; }
         .sub-admin-section.active .sub-admin-content { display: block; }
 
+        .report-tabs { display: flex; border-bottom: 2px solid #eee; margin-bottom: 10px; }
+        .report-tab { flex: 1; text-align: center; padding: 10px; cursor: pointer; color: #666; font-weight: bold; }
+        .report-tab.active { color: var(--primary); border-bottom: 2px solid var(--primary); }
+
         /* 拖曳手把 */
         .sort-handle { cursor: grab; padding: 5px 15px 5px 5px; color: #ccc; font-size: 20px; }
 
@@ -91,7 +95,14 @@
             </div>
             <div id="memo-tags-display" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:15px;"></div>
             <input type="text" id="modal-memo-input" style="width:100%; padding:12px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box;" placeholder="手寫備註...">
-            <button id="modal-confirm-btn" onclick="confirmQtyAction()" style="width:100%; padding:18px; background:var(--success); color:white; border:none; border-radius:10px; font-size:20px; font-weight:bold; margin-top:20px;">加入清單</button>
+            
+            <div style="margin-top:10px; padding:10px; background:#fff3cd; border-radius:8px; display:flex; align-items:center; gap:10px;">
+                <b>💰 調整金額:</b>
+                <input type="number" id="modal-price-adj" placeholder="0" style="width:80px; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                <small>(加錢填正, 減錢填負)</small>
+            </div>
+
+            <button id="modal-confirm-btn" onclick="confirmQtyAction()" style="width:100%; padding:18px; background:var(--success); color:white; border:none; border-radius:10px; font-size:20px; font-weight:bold; margin-top:20px;">確認</button>
             <button onclick="closeModal('qty-modal')" style="width:100%; padding:10px; border:none; background:none; color:gray;">取消</button>
         </div>
     </div>
@@ -101,10 +112,34 @@
             <h2 style="margin:0 0 15px 0;">⚙️ 系統設定</h2>
             
             <div class="admin-section">
-                <div class="admin-header" onclick="toggleAdminSection(this)">📈 歷史營收報表</div>
+                <div class="admin-header" onclick="toggleAdminSection(this)">📈 營收報表中心</div>
                 <div class="admin-content">
-                    <button onclick="clearAllHistory()" style="width:100%; padding:10px; background:#f8d7da; color:#721c24; border:1px solid #f5c6cb; border-radius:8px; margin-bottom:15px; font-weight:bold;">⚠️ 清空所有歷史紀錄</button>
-                    <div id="history-list"></div>
+                    <div class="report-tabs">
+                        <div id="rep-tab-day" class="report-tab active" onclick="switchReportTab('day')">日結</div>
+                        <div id="rep-tab-month" class="report-tab" onclick="switchReportTab('month')">月結</div>
+                        <div id="rep-tab-year" class="report-tab" onclick="switchReportTab('year')">年結</div>
+                    </div>
+
+                    <div id="rep-content-day">
+                        <div style="display:flex; gap:5px; margin-bottom:10px;">
+                            <button onclick="settleToTarget('month')" style="flex:1; padding:10px; background:var(--primary); color:white; border:none; border-radius:5px; font-weight:bold;">執行月結算 (從日結彙整)</button>
+                            <button onclick="clearHistoryByType('day')" style="padding:10px; background:#f8d7da; color:#721c24; border:none; border-radius:5px;">清空</button>
+                        </div>
+                        <div id="list-day"></div>
+                    </div>
+
+                    <div id="rep-content-month" style="display:none;">
+                        <div style="display:flex; gap:5px; margin-bottom:10px;">
+                            <button onclick="settleToTarget('year')" style="flex:1; padding:10px; background:var(--primary); color:white; border:none; border-radius:5px; font-weight:bold;">執行年結算 (從月結彙整)</button>
+                            <button onclick="clearHistoryByType('month')" style="padding:10px; background:#f8d7da; color:#721c24; border:none; border-radius:5px;">清空</button>
+                        </div>
+                        <div id="list-month"></div>
+                    </div>
+
+                    <div id="rep-content-year" style="display:none;">
+                        <button onclick="clearHistoryByType('year')" style="width:100%; padding:10px; background:#f8d7da; color:#721c24; border:none; border-radius:5px; margin-bottom:10px;">清空年結</button>
+                        <div id="list-year"></div>
+                    </div>
                 </div>
             </div>
 
@@ -152,7 +187,6 @@
     </div>
 
     <script>
-        // 設定分類順序：飲料排在最後
         const categories = ['主食','湯品','小菜','其他','飲料'];
         const catWeight = { "主食": 1, "湯品": 2, "小菜": 3, "其他": 4, "飲料": 5 };
         
@@ -177,14 +211,6 @@
         function autoSortMenu() {
             menu.sort((a, b) => {
                 if (a.category !== b.category) return catWeight[a.category] - catWeight[b.category];
-                const getKeywordRank = (name) => {
-                    if (name.includes('炒飯')) return 1;
-                    if (name.includes('炒麵')) return 2;
-                    return 3;
-                };
-                const rankA = getKeywordRank(a.name);
-                const rankB = getKeywordRank(b.name);
-                if (rankA !== rankB) return rankA - rankB;
                 return a.name.localeCompare(b.name, 'zh-Hant');
             });
             localStorage.setItem('myMenu', JSON.stringify(menu));
@@ -202,6 +228,7 @@
             editingCartIdx = editIdx;
             currentItemTarget = { name, price, category };
             document.getElementById('qty-modal-title').innerText = editIdx !== null ? "修改: " + name : name;
+            document.getElementById('modal-price-adj').value = (editIdx !== null && cart[editIdx].adj) ? cart[editIdx].adj : "";
             if (editIdx !== null) {
                 document.getElementById('modal-qty-val').value = cart[editIdx].qty;
                 document.getElementById('modal-memo-input').value = cart[editIdx].memo;
@@ -221,23 +248,25 @@
         function confirmQtyAction() {
             const qty = parseInt(document.getElementById('modal-qty-val').value) || 1;
             const memo = document.getElementById('modal-memo-input').value;
+            const adj = parseInt(document.getElementById('modal-price-adj').value) || 0;
+            const finalPrice = currentItemTarget.price + adj;
+
             if (editingCartIdx !== null) {
-                cart[editingCartIdx].qty = qty; cart[editingCartIdx].memo = memo;
+                cart[editingCartIdx].qty = qty; cart[editingCartIdx].memo = memo; cart[editingCartIdx].adj = adj; cart[editingCartIdx].finalP = finalPrice;
             } else {
-                const ex = cart.find(i=>i.name===currentItemTarget.name && i.memo===memo);
-                if(ex) ex.qty += qty; else cart.push({...currentItemTarget, qty, memo});
+                cart.push({...currentItemTarget, qty, memo, adj, finalP: finalPrice});
             }
-            cart.sort((a,b) => (catWeight[a.category]||99)-(catWeight[b.category]||99));
             renderCart(); closeModal('qty-modal');
         }
 
         function renderCart() {
             let t = 0;
             document.getElementById('cart-items').innerHTML = cart.map((i,idx) => { 
-                t+=i.price*i.qty; 
+                let itemTotal = (i.finalP || i.price) * i.qty;
+                t += itemTotal; 
                 return `
                 <div style="padding:10px 0; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
-                    <div style="flex:1;"><b>${i.name} x ${i.qty}</b><br><small style="color:red;">${i.memo?'('+i.memo+')':''}</small></div>
+                    <div style="flex:1;"><b>${i.name} x ${i.qty}</b> ($${i.finalP || i.price})<br><small style="color:red;">${i.memo?'('+i.memo+')':''}</small></div>
                     <div style="display:flex; gap:10px;">
                         <button onclick="openQtyModal('${i.name}', ${i.price}, '${i.category}', ${idx})" style="border:1px solid #ddd; background:none; padding:5px 8px; border-radius:5px; font-size:16px;">🖊️</button>
                         <button onclick="cart.splice(${idx},1);renderCart()" style="color:red; border:none; background:none; font-size:24px; font-weight:bold;">✕</button>
@@ -260,7 +289,7 @@
             document.getElementById('queue-orders-list').innerHTML = list.map(o => `
                 <div class="order-card">
                     <b>👤 ${o.name || '(未填)'}</b> <small>🕒 ${o.time}</small><br>
-                    ${o.items.map(i => `• ${i.name} x ${i.qty} <span style="color:red;">${i.memo?'('+i.memo+')':''}</span>`).join('<br>')}
+                    ${o.items.map(i => `• ${i.name} x ${i.qty} $${i.finalP||i.price} <span style="color:red;">${i.memo?'('+i.memo+')':''}</span>`).join('<br>')}
                     <div style="text-align:right; font-weight:bold; color:var(--danger);">$${o.total}</div>
                     <div style="display:flex; gap:10px; margin-top:10px;">
                         ${o.status==='waiting' ? `
@@ -274,7 +303,6 @@
         }
 
         function editOrder(id) {
-            if(cart.length > 0 && !confirm('購物車已有東西，修改將會覆蓋，確定？')) return;
             const o = orders.find(x => x.id === id);
             if(o) {
                 cart = JSON.parse(JSON.stringify(o.items));
@@ -291,150 +319,105 @@
         function printOrder(id) {
             const o = orders.find(x => x.id === id);
             const nowTime = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-            
-            const printHTML = `
-                <html>
-                <head>
-                    <title>品味餐館單據</title>
-                    <style>
-                        body { font-family: sans-serif; padding: 10px; color: black; line-height: 1.4; }
-                        .title { text-align: center; font-size: 26px; font-weight: bold; }
-                        .info { display: flex; justify-content: space-between; font-size: 20px; margin: 10px 0; font-weight: bold; }
-                        .item { font-size: 20px; margin: 8px 0; font-weight: bold; }
-                        .memo { padding-left: 20px; font-size: 18px; font-weight: normal; }
-                        .total { text-align: right; font-size: 24px; font-weight: bold; margin-top: 20px; }
-                        hr { border: 0; border-top: 1px solid black; }
-                    </style>
-                </head>
-                <body>
-                    <div class="title">品味餐館</div>
-                    <hr>
-                    <div class="info"><span>👤 ${o.name || '現場客'}</span><span>🕒 ${nowTime}</span></div>
-                    <hr>
-                    ${o.items.map(i => `<div class="item">• ${i.name} x ${i.qty}</div>${i.memo ? `<div class="memo">> ${i.memo}</div>` : ''}`).join('')}
-                    <hr>
-                    <div class="total">總計: $${o.total}</div>
-                    <script>
-                        window.onload = function() {
-                            window.print();
-                            setTimeout(function() { window.close(); }, 500);
-                        };
-                    <\/script>
-                </body>
-                </html>`;
-
-            const printWindow = window.open('', '_blank');
-            if (printWindow) {
-                printWindow.document.write(printHTML);
-                printWindow.document.close();
-            } else {
-                alert('請允許開啟彈出式視窗以進行列印');
-            }
+            const printHTML = `<html><head><title>單據</title><style>body{font-family:sans-serif;padding:10px;line-height:1.4;}.title{text-align:center;font-size:26px;font-weight:bold;}.info{display:flex;justify-content:space-between;font-size:20px;margin:10px 0;}.item{font-size:20px;font-weight:bold;}.memo{font-size:18px;padding-left:15px;}.total{text-align:right;font-size:24px;font-weight:bold;}</style></head>
+                <body><div class="title">品味餐館</div><hr><div class="info"><span>👤 ${o.name||'現場'}</span><span>🕒 ${nowTime}</span></div><hr>
+                ${o.items.map(i=>`<div class="item">• ${i.name} x ${i.qty} ($${i.finalP||i.price})</div>${i.memo?`<div class="memo">> ${i.memo}</div>`:''}`).join('')}<hr>
+                <div class="total">總計: $${o.total}</div><script>window.onload=function(){window.print();setTimeout(function(){window.close();},500);};<\/script></body></html>`;
+            const win = window.open('','_blank'); win.document.write(printHTML); win.document.close();
         }
 
-        function openSettings() { renderHistoryList(); renderAdminMenuLists(); renderAdminMemoList(); document.getElementById('settings-modal').style.display = 'block'; }
-
-        function renderAdminMenuLists() {
-            let h = ""; 
-            categories.forEach(c => { 
-                let it = menu.filter(m=>m.category===c); 
-                h += `
-                <div class="sub-admin-section">
-                    <div class="sub-admin-header">
-                        <span>${c}類 (${it.length})</span>
-                        <button onclick="toggleSubAdmin(this)" style="padding:4px 8px; font-size:12px; background:#666; color:white; border:none; border-radius:4px;">展開/收合</button>
-                    </div>
-                    <div class="sub-admin-content" id="list-${c}">
-                        ${it.map(m=> `<div class="admin-sort-item" data-name="${m.name}" style="padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
-                            <div><span class="sort-handle">☰</span>${m.name}($${m.price})</div>
-                            <button onclick="deleteMenuItemByName('${m.name}', '${c}')" style="color:red; border:1px solid red; border-radius:5px; padding:2px 8px; font-size:12px;">刪除</button>
-                        </div>`).join('') || '無項目'}
-                    </div>
-                </div>`;
+        function switchReportTab(t) {
+            ['day','month','year'].forEach(type => {
+                document.getElementById('rep-tab-'+type).className = 'report-tab ' + (type===t?'active':'');
+                document.getElementById('rep-content-'+type).style.display = type===t?'block':'none';
             });
-            document.getElementById('admin-menu-list').innerHTML = h;
+            renderHistoryLists();
+        }
 
-            categories.forEach(c => {
-                const el = document.getElementById('list-' + c);
-                if(el) {
-                    new Sortable(el, {
-                        handle: '.sort-handle', animation: 150,
-                        onEnd: function() {
-                            const sortedNames = Array.from(el.querySelectorAll('.admin-sort-item')).map(i => i.getAttribute('data-name'));
-                            const others = menu.filter(m => m.category !== c);
-                            const current = sortedNames.map(name => menu.find(m => m.name === name && m.category === c));
-                            menu = [...others, ...current];
-                            localStorage.setItem('myMenu', JSON.stringify(menu));
-                            renderMenu(currentCat);
-                        }
-                    });
-                }
+        function renderHistoryLists() {
+            ['day','month','year'].forEach(type => {
+                const list = history.filter(h => h.type === type || (!h.type && type==='day'));
+                document.getElementById('list-'+type).innerHTML = list.map((h, idx) => `
+                    <div style="padding:10px 0; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+                        <div>📅 ${h.date}：<b>$${h.amount}</b></div>
+                        <button onclick="deleteHistoryItemByID(${h.id || 0}, ${idx})" style="color:red; border:1px solid red; background:none; padding:4px 8px; border-radius:5px; font-size:12px;">刪除</button>
+                    </div>`).join('') || '<p style="text-align:center; color:gray;">無紀錄</p>';
             });
         }
 
-        function addMenuItem() {
-            const n = document.getElementById('new-item-name').value.trim();
-            const p = document.getElementById('new-item-price').value;
-            const c = document.getElementById('new-item-cat').value;
-            if(n && p) {
-                menu.push({name:n, price:parseInt(p), category:c});
-                autoSortMenu();
-                document.getElementById('new-item-name').value = ""; document.getElementById('new-item-price').value = "";
-                renderAdminMenuLists(); renderMenu(currentCat);
+        function deleteHistoryItemByID(id, idx) {
+            if(confirm('確定刪除？')) {
+                if(id) history = history.filter(h => h.id !== id); else history.splice(idx, 1);
+                localStorage.setItem('myHistory', JSON.stringify(history)); renderHistoryLists();
             }
         }
 
-        function deleteMenuItemByName(name, cat) {
-            if(confirm('確定刪除此品項？')){
-                menu = menu.filter(m => !(m.name === name && m.category === cat));
-                localStorage.setItem('myMenu', JSON.stringify(menu));
-                renderAdminMenuLists(); renderMenu(currentCat);
+        function clearHistoryByType(t) {
+            if(confirm('確定清空？')) { history = history.filter(h => h.type !== t && (t!=='day' || h.type)); localStorage.setItem('myHistory', JSON.stringify(history)); renderHistoryLists(); }
+        }
+
+        function settleToTarget(target) {
+            const now = new Date();
+            let filterType = target === 'month' ? 'day' : 'month';
+            const source = history.filter(h => h.type === filterType || (!h.type && filterType==='day'));
+            if(!source.length) return alert('無資料彙整');
+            const sum = source.reduce((s, h) => s + h.amount, 0);
+            const label = target === 'month' ? `${now.getFullYear()}/${now.getMonth()+1} 月結` : `${now.getFullYear()} 年結`;
+            if(confirm(`彙整金額 $${sum} 執行 [${label}]？`)){
+                history.unshift({ id: Date.now(), type: target, date: label, amount: sum });
+                localStorage.setItem('myHistory', JSON.stringify(history)); renderHistoryLists();
             }
         }
 
-        function renderAdminMemoList() {
-            const container = document.getElementById('admin-memo-drag-list');
-            container.innerHTML = memos.map((m,idx) => `
-                <div class="memo-item" data-id="${m}" style="display:inline-flex; align-items:center; background:white; border:1px solid #ddd; padding:8px; border-radius:8px;">
-                    <span class="sort-handle" style="font-size:14px; padding-right:5px;">☰</span>
-                    ${m}
-                    <span onclick="deleteMemoLabel(${idx})" style="color:red; cursor:pointer; margin-left:8px; font-weight:bold;">✕</span>
-                </div>`).join('');
-
-            new Sortable(container, {
-                handle: '.sort-handle', animation: 150,
-                onEnd: function() {
-                    memos = Array.from(container.querySelectorAll('.memo-item')).map(i => i.getAttribute('data-id'));
-                    localStorage.setItem('myMemos', JSON.stringify(memos));
-                }
-            });
-        }
-
-        function addMemoLabel() {
-            const i = document.getElementById('new-memo-input');
-            if(i.value.trim()){ memos.push(i.value.trim()); i.value=''; localStorage.setItem('myMemos', JSON.stringify(memos)); renderAdminMemoList(); }
-        }
-        function deleteMemoLabel(idx) { memos.splice(idx,1); localStorage.setItem('myMemos', JSON.stringify(memos)); renderAdminMemoList(); }
-
-        function renderHistoryList() {
-            document.getElementById('history-list').innerHTML = history.map((h, idx) => `<div style="padding:10px 0; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;"><div>📅 ${h.date}：<b>$${h.amount}</b></div><button onclick="deleteHistoryItem(${idx})" style="color:red; border:1px solid red; background:none; padding:4px 8px; border-radius:5px; font-size:12px;">刪除</button></div>`).join('') || '<p style="text-align:center; color:gray;">尚無歷史紀錄</p>';
-        }
-        function deleteHistoryItem(idx) { if(confirm('確定要刪除這筆歷史紀錄嗎？')) { history.splice(idx, 1); localStorage.setItem('myHistory', JSON.stringify(history)); renderHistoryList(); } }
-        function clearAllHistory() { if(confirm('⚠️ 警告：這將會永久清空「所有」歷史營收紀錄！確定嗎？')) { history = []; localStorage.setItem('myHistory', JSON.stringify(history)); renderHistoryList(); } }
-        
         function dailySettlement() {
             const total = orders.filter(o=>o.status==='done').reduce((sum,o)=>sum+parseInt(o.total),0);
             if(total===0) return;
             if(confirm(`結算今日營收 $${total}？`)){
-                history.unshift({ date: new Date().toLocaleDateString(), amount: total });
+                history.unshift({ id: Date.now(), type: 'day', date: new Date().toLocaleDateString(), amount: total });
                 orders = orders.filter(o=>o.status!=='done');
-                localStorage.setItem('myHistory', JSON.stringify(history));
-                localStorage.setItem('myOrders', JSON.stringify(orders));
+                localStorage.setItem('myHistory', JSON.stringify(history)); localStorage.setItem('myOrders', JSON.stringify(orders));
                 renderQueue();
             }
         }
 
+        function openSettings() { renderHistoryLists(); renderAdminMenuLists(); renderAdminMemoList(); document.getElementById('settings-modal').style.display = 'block'; }
         function closeModal(id) { document.getElementById(id).style.display='none'; }
+
+        // --- 保持原本的拖曳與管理邏輯 ---
+        function renderAdminMenuLists() {
+            let h = ""; 
+            categories.forEach(c => { 
+                let it = menu.filter(m=>m.category===c); 
+                h += `<div class="sub-admin-section"><div class="sub-admin-header"><span>${c}類 (${it.length})</span><button onclick="toggleSubAdmin(this)" style="padding:4px 8px; font-size:12px; background:#666; color:white; border:none; border-radius:4px;">展開/收合</button></div>
+                    <div class="sub-admin-content" id="list-${c}">${it.map(m=> `<div class="admin-sort-item" data-name="${m.name}" style="padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;"><div><span class="sort-handle">☰</span>${m.name}($${m.price})</div><button onclick="deleteMenuItemByName('${m.name}', '${c}')" style="color:red; border:1px solid red; border-radius:5px; padding:2px 8px; font-size:12px;">刪除</button></div>`).join('') || '無項目'}</div></div>`;
+            });
+            document.getElementById('admin-menu-list').innerHTML = h;
+            categories.forEach(c => {
+                const el = document.getElementById('list-' + c);
+                if(el) new Sortable(el, { handle: '.sort-handle', animation: 150, onEnd: function() {
+                    const sortedNames = Array.from(el.querySelectorAll('.admin-sort-item')).map(i => i.getAttribute('data-name'));
+                    const others = menu.filter(m => m.category !== c);
+                    const current = sortedNames.map(name => menu.find(m => m.name === name && m.category === c));
+                    menu = [...others, ...current]; localStorage.setItem('myMenu', JSON.stringify(menu)); renderMenu(currentCat);
+                }});
+            });
+        }
+
+        function addMenuItem() {
+            const n = document.getElementById('new-item-name').value.trim(), p = document.getElementById('new-item-price').value, c = document.getElementById('new-item-cat').value;
+            if(n && p) { menu.push({name:n, price:parseInt(p), category:c}); autoSortMenu(); document.getElementById('new-item-name').value = ""; document.getElementById('new-item-price').value = ""; renderAdminMenuLists(); renderMenu(currentCat); }
+        }
+
+        function deleteMenuItemByName(name, cat) { if(confirm('刪除？')){ menu = menu.filter(m => !(m.name === name && m.category === cat)); localStorage.setItem('myMenu', JSON.stringify(menu)); renderAdminMenuLists(); renderMenu(currentCat); }}
+
+        function renderAdminMemoList() {
+            const container = document.getElementById('admin-memo-drag-list');
+            container.innerHTML = memos.map((m,idx) => `<div class="memo-item" data-id="${m}" style="display:inline-flex; align-items:center; background:white; border:1px solid #ddd; padding:8px; border-radius:8px;"><span class="sort-handle" style="font-size:14px; padding-right:5px;">☰</span>${m}<span onclick="deleteMemoLabel(${idx})" style="color:red; cursor:pointer; margin-left:8px; font-weight:bold;">✕</span></div>`).join('');
+            new Sortable(container, { handle: '.sort-handle', animation: 150, onEnd: function() { memos = Array.from(container.querySelectorAll('.memo-item')).map(i => i.getAttribute('data-id')); localStorage.setItem('myMemos', JSON.stringify(memos)); }});
+        }
+        function addMemoLabel() { const i = document.getElementById('new-memo-input'); if(i.value.trim()){ memos.push(i.value.trim()); i.value=''; localStorage.setItem('myMemos', JSON.stringify(memos)); renderAdminMemoList(); }}
+        function deleteMemoLabel(idx) { memos.splice(idx,1); localStorage.setItem('myMemos', JSON.stringify(memos)); renderAdminMemoList(); }
+
         init();
     </script>
 </body>
