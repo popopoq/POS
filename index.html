@@ -57,6 +57,9 @@
         .footer-nav { position: fixed; bottom: 0; left: 0; right: 0; background: white; display: flex; border-top: 1px solid #ddd; padding: 10px; z-index: 1000; }
         .footer-nav button { flex: 1; background: none; border: none; font-weight: bold; padding: 10px; font-size: 16px; color: #666; }
         .footer-nav button.active { color: var(--primary); }
+
+        /* 日期編輯框樣式 */
+        .history-date-input { border: 1px solid #ccc; border-radius: 5px; padding: 4px 8px; font-size: 14px; width: 140px; }
     </style>
 </head>
 <body>
@@ -194,7 +197,7 @@
         let memos = JSON.parse(localStorage.getItem('myMemos')) || ['微辣','❌蔥','外帶','加辣'];
         let cart = [], orders = JSON.parse(localStorage.getItem('myOrders')) || [];
         let history = JSON.parse(localStorage.getItem('myHistory')) || [];
-        let currentCat = '主食', queueTab = 'waiting', editingCartIdx = null;
+        let currentCat = '主食', queueTab = 'waiting', editingCartIdx = null, currentItemTarget = null;
 
         function init() { renderTabs(); renderMenu(currentCat); renderCart(); renderQueue(); }
         function showPage(p) {
@@ -254,19 +257,37 @@
             if (editingCartIdx !== null) {
                 cart[editingCartIdx].qty = qty; cart[editingCartIdx].memo = memo; cart[editingCartIdx].adj = adj; cart[editingCartIdx].finalP = finalPrice;
             } else {
-                cart.push({...currentItemTarget, qty, memo, adj, finalP: finalPrice});
+                const existing = cart.find(i => i.name === currentItemTarget.name && i.category === currentItemTarget.category && i.memo === memo && i.adj === adj);
+                if (existing) {
+                    existing.qty += qty;
+                } else {
+                    cart.push({...currentItemTarget, qty, memo, adj, finalP: finalPrice});
+                }
             }
             renderCart(); closeModal('qty-modal');
         }
 
+        /* --- 核心優化：購物車排序邏輯 (分類權重優先，再依菜單管理順序) --- */
         function renderCart() {
+            cart.sort((a, b) => {
+                // 1. 先比較大分類權重 (主食=1, 湯品=2...)
+                const weightA = catWeight[a.category] || 99;
+                const weightB = catWeight[b.category] || 99;
+                if (weightA !== weightB) return weightA - weightB;
+
+                // 2. 若分類相同，則比對在 menu 中的原始索引
+                const idxA = menu.findIndex(m => m.name === a.name && m.category === a.category);
+                const idxB = menu.findIndex(m => m.name === b.name && m.category === b.category);
+                return idxA - idxB;
+            });
+
             let t = 0;
             document.getElementById('cart-items').innerHTML = cart.map((i,idx) => { 
                 let itemTotal = (i.finalP || i.price) * i.qty;
                 t += itemTotal; 
                 return `
                 <div style="padding:10px 0; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
-                    <div style="flex:1;"><b>${i.name} x ${i.qty}</b> ($${i.finalP || i.price})<br><small style="color:red;">${i.memo?'('+i.memo+')':''}</small></div>
+                    <div style="flex:1;"><b>${i.name} x ${i.qty}</b> ($${itemTotal})<br><small style="color:red;">${i.memo?'('+i.memo+')':''}</small></div>
                     <div style="display:flex; gap:10px;">
                         <button onclick="openQtyModal('${i.name}', ${i.price}, '${i.category}', ${idx})" style="border:1px solid #ddd; background:none; padding:5px 8px; border-radius:5px; font-size:16px;">🖊️</button>
                         <button onclick="cart.splice(${idx},1);renderCart()" style="color:red; border:none; background:none; font-size:24px; font-weight:bold;">✕</button>
@@ -289,7 +310,7 @@
             document.getElementById('queue-orders-list').innerHTML = list.map(o => `
                 <div class="order-card">
                     <b>👤 ${o.name || '(未填)'}</b> <small>🕒 ${o.time}</small><br>
-                    ${o.items.map(i => `• ${i.name} x ${i.qty} $${i.finalP||i.price} <span style="color:red;">${i.memo?'('+i.memo+')':''}</span>`).join('<br>')}
+                    ${o.items.map(i => `• ${i.name} x ${i.qty} $${(i.finalP||i.price)*i.qty} <span style="color:red;">${i.memo?'('+i.memo+')':''}</span>`).join('<br>')}
                     <div style="text-align:right; font-weight:bold; color:var(--danger);">$${o.total}</div>
                     <div style="display:flex; gap:10px; margin-top:10px;">
                         ${o.status==='waiting' ? `
@@ -321,7 +342,7 @@
             const nowTime = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
             const printHTML = `<html><head><title>單據</title><style>body{font-family:sans-serif;padding:10px;line-height:1.4;}.title{text-align:center;font-size:26px;font-weight:bold;}.info{display:flex;justify-content:space-between;font-size:20px;margin:10px 0;}.item{font-size:20px;font-weight:bold;}.memo{font-size:18px;padding-left:15px;}.total{text-align:right;font-size:24px;font-weight:bold;}</style></head>
                 <body><div class="title">品味餐館</div><hr><div class="info"><span>👤 ${o.name||'現場'}</span><span>🕒 ${nowTime}</span></div><hr>
-                ${o.items.map(i=>`<div class="item">• ${i.name} x ${i.qty} ($${i.finalP||i.price})</div>${i.memo?`<div class="memo">> ${i.memo}</div>`:''}`).join('')}<hr>
+                ${o.items.map(i=>`<div class="item">• ${i.name} x ${i.qty} ($${(i.finalP||i.price)*i.qty})</div>${i.memo?`<div class=\"memo\">> ${i.memo}</div>`:''}`).join('')}<hr>
                 <div class="total">總計: $${o.total}</div><script>window.onload=function(){window.print();setTimeout(function(){window.close();},500);};<\/script></body></html>`;
             const win = window.open('','_blank'); win.document.write(printHTML); win.document.close();
         }
@@ -335,14 +356,28 @@
         }
 
         function renderHistoryLists() {
+            history.sort((a, b) => new Date(b.date.replace(' 月結', '').replace(' 年結', '')) - new Date(a.date.replace(' 月結', '').replace(' 年結', ''))).reverse();
+
             ['day','month','year'].forEach(type => {
                 const list = history.filter(h => h.type === type || (!h.type && type==='day'));
                 document.getElementById('list-'+type).innerHTML = list.map((h, idx) => `
                     <div style="padding:10px 0; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
-                        <div>📅 ${h.date}：<b>$${h.amount}</b></div>
+                        <div>
+                           📅 <input type="text" class="history-date-input" value="${h.date}" onchange="updateHistoryDate(${h.id}, this.value)">
+                           ：<b>$${h.amount}</b>
+                        </div>
                         <button onclick="deleteHistoryItemByID(${h.id || 0}, ${idx})" style="color:red; border:1px solid red; background:none; padding:4px 8px; border-radius:5px; font-size:12px;">刪除</button>
                     </div>`).join('') || '<p style="text-align:center; color:gray;">無紀錄</p>';
             });
+        }
+
+        function updateHistoryDate(id, newDate) {
+            const item = history.find(h => h.id === id);
+            if(item) {
+                item.date = newDate;
+                localStorage.setItem('myHistory', JSON.stringify(history));
+                renderHistoryLists();
+            }
         }
 
         function deleteHistoryItemByID(id, idx) {
@@ -383,7 +418,6 @@
         function openSettings() { renderHistoryLists(); renderAdminMenuLists(); renderAdminMemoList(); document.getElementById('settings-modal').style.display = 'block'; }
         function closeModal(id) { document.getElementById(id).style.display='none'; }
 
-        // --- 保持原本的拖曳與管理邏輯 ---
         function renderAdminMenuLists() {
             let h = ""; 
             categories.forEach(c => { 
